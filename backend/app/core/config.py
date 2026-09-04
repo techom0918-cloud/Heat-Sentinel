@@ -234,71 +234,83 @@ class Settings(BaseSettings):
             "SHADE_REST_AREA": self.INTERVENTION_SHADE_REST_AREA_EFFECT,
         }
 
-    # ---- Early warning & alerts (Phase 11) -------------------------------
-    # The 5-band scale produced by the trained model / Phase 7 trajectory
-    # (heat HAZARD categories: LOW..EXTREME). Alerts are evaluated on this
-    # scale, not the 4-band Phase 5 combined-risk scale, because the
-    # trajectory is what actually carries a forecast peak and a peak date.
-    ALERT_LEVELS: str = "LOW,MODERATE,HIGH,VERY_HIGH,EXTREME"
-    # Alert is required once the forecast peak reaches this level or above.
-    # An escalation (today's level vs. the peak) below this threshold is
-    # still detected and reported, but does not independently force an
-    # alert -- see alert_service.evaluate_alert.
-    ALERT_MIN_LEVEL: str = "HIGH"
-    # Vulnerability level (Phase 4 scale) at/above which alert priority is
-    # escalated, per the "high heat + high vulnerability" rule.
-    ALERT_HIGH_VULNERABILITY_LEVELS: str = "HIGH,EXTREME"
+    # ---- AI Action Optimizer (Phase 10) ----------------------------------
+    # PROTOTYPE UNIT ECONOMICS, NOT VALIDATED. Each intervention type maps to
+    # the physical resource it consumes, a cost per unit, and the fraction of
+    # a zone's population one unit is assumed to cover (linear, capped at
+    # 100%). Held here (and only here) so real procurement costs and reach
+    # figures can replace these without touching optimizer_service.py.
+    # Effectiveness itself is NOT duplicated here -- it still comes from
+    # INTERVENTION_*_EFFECT above via the Phase 9 simulator.
+    OPTIMIZER_COOLING_CENTER_RESOURCE: str = "cooling_centers"
+    OPTIMIZER_COOLING_CENTER_UNIT_COST: float = 50000.0
+    OPTIMIZER_COOLING_CENTER_COVERAGE_PER_UNIT: float = 0.15
+
+    OPTIMIZER_WATER_DISTRIBUTION_RESOURCE: str = "water_tankers"
+    OPTIMIZER_WATER_DISTRIBUTION_UNIT_COST: float = 8000.0
+    OPTIMIZER_WATER_DISTRIBUTION_COVERAGE_PER_UNIT: float = 0.08
+
+    # WORK_HOUR_SHIFT, PUBLIC_ALERT and SHADE_REST_AREA are all assumed to
+    # draw on the same "field_workers" pool (coordinating shift compliance,
+    # disseminating alerts, and standing up shaded rest areas respectively),
+    # so the optimizer must trade them off against one another for the same
+    # people -- a deliberate, documented prototype assumption.
+    OPTIMIZER_WORK_HOUR_SHIFT_RESOURCE: str = "field_workers"
+    OPTIMIZER_WORK_HOUR_SHIFT_UNIT_COST: float = 2000.0
+    OPTIMIZER_WORK_HOUR_SHIFT_COVERAGE_PER_UNIT: float = 0.02
+
+    OPTIMIZER_PUBLIC_ALERT_RESOURCE: str = "field_workers"
+    OPTIMIZER_PUBLIC_ALERT_UNIT_COST: float = 500.0
+    OPTIMIZER_PUBLIC_ALERT_COVERAGE_PER_UNIT: float = 0.02
+
+    OPTIMIZER_SHADE_REST_AREA_RESOURCE: str = "field_workers"
+    OPTIMIZER_SHADE_REST_AREA_UNIT_COST: float = 15000.0
+    OPTIMIZER_SHADE_REST_AREA_COVERAGE_PER_UNIT: float = 0.05
+
+    # Hard ceiling on greedy search steps, independent of budget/resource
+    # size, so a pathological request cannot make the optimizer loop forever.
+    OPTIMIZER_MAX_ITERATIONS: int = 1000
 
     @property
-    def alert_levels_list(self) -> list[str]:
-        return [
-            label.strip()
-            for label in self.ALERT_LEVELS.split(",")
-            if label.strip()
-        ]
-
-    @property
-    def alert_high_vulnerability_levels_list(self) -> list[str]:
-        return [
-            label.strip()
-            for label in self.ALERT_HIGH_VULNERABILITY_LEVELS.split(",")
-            if label.strip()
-        ]
-
-    @property
-    def alert_recommended_actions(self) -> dict[str, list[str]]:
-        """Decision-support action text per alert level. Not medical advice."""
+    def optimizer_unit_economics(self) -> dict[str, dict[str, float | str]]:
+        """Per-intervention resource type, unit cost and coverage per unit."""
         return {
-            "LOW": [],
-            "MODERATE": ["Monitor the forecast for further escalation."],
-            "HIGH": [
-                "Activate cooling centers",
-                "Issue public heat advisory",
-                "Review outdoor work schedules",
-            ],
-            "VERY_HIGH": [
-                "Activate cooling centers",
-                "Issue public heat warning",
-                "Review outdoor work restrictions",
-                "Prioritise water distribution in high-vulnerability zones",
-            ],
-            "EXTREME": [
-                "Activate cooling centers",
-                "Issue public heat warning",
-                "Review outdoor work restrictions",
-                "Prioritise water distribution in high-vulnerability zones",
-                "Coordinate with local health authorities",
-            ],
+            "COOLING_CENTER": {
+                "resource": self.OPTIMIZER_COOLING_CENTER_RESOURCE,
+                "unit_cost": self.OPTIMIZER_COOLING_CENTER_UNIT_COST,
+                "coverage_per_unit": (
+                    self.OPTIMIZER_COOLING_CENTER_COVERAGE_PER_UNIT
+                ),
+            },
+            "WATER_DISTRIBUTION": {
+                "resource": self.OPTIMIZER_WATER_DISTRIBUTION_RESOURCE,
+                "unit_cost": self.OPTIMIZER_WATER_DISTRIBUTION_UNIT_COST,
+                "coverage_per_unit": (
+                    self.OPTIMIZER_WATER_DISTRIBUTION_COVERAGE_PER_UNIT
+                ),
+            },
+            "WORK_HOUR_SHIFT": {
+                "resource": self.OPTIMIZER_WORK_HOUR_SHIFT_RESOURCE,
+                "unit_cost": self.OPTIMIZER_WORK_HOUR_SHIFT_UNIT_COST,
+                "coverage_per_unit": (
+                    self.OPTIMIZER_WORK_HOUR_SHIFT_COVERAGE_PER_UNIT
+                ),
+            },
+            "PUBLIC_ALERT": {
+                "resource": self.OPTIMIZER_PUBLIC_ALERT_RESOURCE,
+                "unit_cost": self.OPTIMIZER_PUBLIC_ALERT_UNIT_COST,
+                "coverage_per_unit": (
+                    self.OPTIMIZER_PUBLIC_ALERT_COVERAGE_PER_UNIT
+                ),
+            },
+            "SHADE_REST_AREA": {
+                "resource": self.OPTIMIZER_SHADE_REST_AREA_RESOURCE,
+                "unit_cost": self.OPTIMIZER_SHADE_REST_AREA_UNIT_COST,
+                "coverage_per_unit": (
+                    self.OPTIMIZER_SHADE_REST_AREA_COVERAGE_PER_UNIT
+                ),
+            },
         }
-
-    # ---- Health / mortality data integration (Phase 12) ------------------
-    # Relative to backend/ unless absolute. REAL government-reported data
-    # (see the file's own `source` column), not synthetic.
-    HEALTH_DATA_CSV_PATH: str = "data/health/heat_wave_deaths_india_2018_2022.csv"
-    # A state-year is labelled an observed "high-risk event" once reported
-    # deaths reach this count. PROTOTYPE THRESHOLD, not an epidemiological
-    # cut-off -- configurable so it can be recalibrated.
-    HEALTH_HIGH_RISK_DEATH_THRESHOLD: int = 50
 
     # ---- Trained model integration --------------------------------------
     # Paths are relative to backend/ unless absolute.
