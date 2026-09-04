@@ -1,8 +1,9 @@
-"""Heat action simulator endpoints (Phase 9)."""
+"""Heat action simulator endpoints (Phase 9) and AI action optimizer (Phase 10)."""
 
 from fastapi import APIRouter
 
 from app.core.config import settings
+from app.core.exceptions import ExternalServiceError
 from app.models.common import ErrorResponse
 from app.models.intervention import (
     InterventionCatalogue,
@@ -10,9 +11,11 @@ from app.models.intervention import (
     SimulationRequest,
     SimulationResponse,
 )
+from app.models.optimizer import OptimizerRequest, OptimizerResponse
 from app.services import (
     geospatial_service,
     intervention_service,
+    optimizer_service,
     thermal_service,
     weather_service,
 )
@@ -57,8 +60,26 @@ so they are directly comparable. Nothing retrains or touches the ML model.
     description=_DESCRIPTION,
 )
 async def simulate(payload: SimulationRequest) -> SimulationResponse:
+    weather_kwargs = await _zone_weather_kwargs(payload.zone_id)
+
+    return SimulationResponse(
+        **intervention_service.simulate(
+            **weather_kwargs,
+            interventions=[i.model_dump() for i in payload.interventions],
+            zone_id=payload.zone_id,
+        )
+    )
+
+
+async def _zone_weather_kwargs(zone_id: str) -> dict:
+    """Current thermal + vulnerability inputs for one zone.
+
+    Shared by /simulate and /optimize so both feed the same Phase 5/9 inputs
+    from the same fetch. Raises 404 (unknown zone) or 502 (no humidity from
+    the weather provider) via the standard exception handlers.
+    """
     # Raises 404 with the available zone list if the id is unknown.
-    feature = geospatial_service.get_zone(payload.zone_id)
+    feature = geospatial_service.get_zone(zone_id)
     vulnerability = geospatial_service.zone_vulnerability(feature)
 
     centroid = feature["properties"].get("centroid") or [77.2090, 28.6139]
@@ -67,12 +88,10 @@ async def simulate(payload: SimulationRequest) -> SimulationResponse:
 
     humidity = observation.relative_humidity
     if humidity is None:
-        from app.core.exceptions import ExternalServiceError
-
         raise ExternalServiceError(
             "The weather provider supplied no humidity, so a baseline risk "
             "cannot be established for this zone.",
-            details={"zone_id": payload.zone_id},
+            details={"zone_id": zone_id},
         )
 
     thermal = thermal_service.calculate_thermal_stress(
@@ -82,20 +101,16 @@ async def simulate(payload: SimulationRequest) -> SimulationResponse:
         solar_radiation=observation.solar_radiation_wm2,
     )
 
-    return SimulationResponse(
-        **intervention_service.simulate(
-            temperature_c=observation.temperature_c,
-            relative_humidity=humidity,
-            wind_speed=observation.wind_speed_ms or 0.0,
-            solar_radiation=observation.solar_radiation_wm2,
-            heat_index=thermal.heat_index,
-            wbgt=thermal.wbgt,
-            utci=thermal.utci,
-            vulnerability_score=vulnerability.vulnerability_score,
-            interventions=[i.model_dump() for i in payload.interventions],
-            zone_id=payload.zone_id,
-        )
-    )
+    return {
+        "temperature_c": observation.temperature_c,
+        "relative_humidity": humidity,
+        "wind_speed": observation.wind_speed_ms or 0.0,
+        "solar_radiation": observation.solar_radiation_wm2,
+        "heat_index": thermal.heat_index,
+        "wbgt": thermal.wbgt,
+        "utci": thermal.utci,
+        "vulnerability_score": vulnerability.vulnerability_score,
+    }
 
 
 @router.get(
@@ -123,4 +138,57 @@ async def intervention_types() -> InterventionCatalogue:
             for kind, entry in sorted(catalogue.items())
         ],
         disclaimer=intervention_service.SIMULATION_DISCLAIMER,
+    )
+
+
+_OPTIMIZE_DESCRIPTION = """
+Given a budget, available resources and allowed intervention types, chooses
+the feasible plan that maximises **modelled** risk reduction.
+
+> **This is a MODELLED RECOMMENDATION**, not a guaranteed optimum and not a
+> medical claim. It does **not** estimate deaths prevented or mortality
+> reduction, and it does **not** execute anything in the real world.
+
+**Architecture.** This endpoint does not recompute intervention
+effectiveness. It reuses the Phase 9 `/interventions/simulate` engine to
+score every candidate plan, and adds only the piece Phase 9 does not have:
+translating resource *units* (cooling centres, water tankers, field
+workers) into the *coverage fraction* Phase 9 expects, via configured
+prototype unit costs and coverage-per-unit.
+
+**Method.** A deterministic greedy search: repeatedly add whichever single
+resource unit yields the largest modelled risk reduction per unit of
+budget, among interventions that are still affordable, still have resource
+units available, and have not yet reached 100% modelled coverage. Stops
+when no affordable, resourced unit improves risk. This is a transparent
+heuristic, not exhaustive combinatorial search, which is exponential.
+
+`WORK_HOUR_SHIFT`, `PUBLIC_ALERT` and `SHADE_REST_AREA` all draw on the
+same `field_workers` pool, so the optimizer must trade them off against one
+another for the same people.
+"""
+
+
+@router.post(
+    "/optimize",
+    response_model=OptimizerResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Unknown zone."},
+        422: {"model": ErrorResponse, "description": "Invalid request."},
+        502: {"model": ErrorResponse, "description": "Weather provider failure."},
+    },
+    summary="Recommend the best feasible intervention plan for a zone",
+    description=_OPTIMIZE_DESCRIPTION,
+)
+async def optimize(payload: OptimizerRequest) -> OptimizerResponse:
+    weather_kwargs = await _zone_weather_kwargs(payload.zone_id)
+
+    return OptimizerResponse(
+        **optimizer_service.optimize(
+            zone_id=payload.zone_id,
+            budget=payload.budget,
+            available_resources=payload.available_resources.model_dump(),
+            allowed_interventions=payload.allowed_interventions,
+            **weather_kwargs,
+        )
     )
