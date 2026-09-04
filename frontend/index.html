@@ -14,6 +14,7 @@
     <div id="map"></div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
     <script>
         // Initialize map centered on Delhi (change coordinates to your target city)
         const map = L.map('map').setView([28.6139, 77.2090], 12);
@@ -134,6 +135,31 @@ dayControl.onAdd = function () {
 };
 
 dayControl.addTo(map);
+// Load real transit heat exposure data
+Papa.parse('data/transit_stops.csv', {
+    download: true,
+    header: true,
+    dynamicTyping: true,
+    complete: function(results) {
+        const stops = results.data.filter(row => row.city === 'Delhi' && row.lat && row.lon);
+
+        stops.forEach(stop => {
+            const color = getColor(stop.thei_tier);
+
+            L.circleMarker([stop.lat, stop.lon], {
+                radius: 5,
+                fillColor: color,
+                color: 'white',
+                weight: 1,
+                fillOpacity: 0.8
+            })
+            .addTo(map)
+            .bindPopup(`<b>${stop.name}</b><br>Mode: ${stop.mode}<br>THEI Score: ${stop.thei}<br>Risk: ${stop.thei_tier}`);
+        });
+
+        console.log(`Loaded ${stops.length} real Delhi transit stops`);
+    }
+});
     </script>
 
 </body>
