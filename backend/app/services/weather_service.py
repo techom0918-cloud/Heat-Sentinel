@@ -66,6 +66,15 @@ _DAILY_VARIABLES = (
     "shortwave_radiation_sum",
 )
 
+# Exactly the four variables heat_pipeline.py fetched for training. Adding
+# or reordering these would break train/serve parity.
+_ML_HISTORY_VARIABLES = (
+    "temperature_2m",
+    "relative_humidity_2m",
+    "wind_speed_10m",
+    "shortwave_radiation",
+)
+
 
 # ---------------------------------------------------------------------------
 # Validation
@@ -426,6 +435,47 @@ async def get_forecast(
         provider=settings.WEATHER_PROVIDER,
         retrieved_at=datetime.now(timezone.utc),
     )
+
+
+async def get_hourly_history(
+    latitude: float, longitude: float, past_days: int
+) -> dict[str, Any]:
+    """Fetch recent hourly observations for one coordinate pair.
+
+    Returns the raw hourly series rather than a HeatSentinal schema, because
+    the only consumer is the ML feature builder, which needs the same shape
+    the training pipeline saw. Provider isolation is preserved: this is
+    still the only module issuing the request.
+    """
+    validate_coordinates(latitude, longitude)
+    if past_days < 1 or past_days > 92:
+        raise ValidationError(
+            "past_days must be between 1 and 92.",
+            details={"field": "past_days", "received": past_days},
+        )
+
+    params = _base_params(latitude, longitude)
+    params["hourly"] = ",".join(_ML_HISTORY_VARIABLES)
+    params["past_days"] = past_days
+    params["forecast_days"] = 1
+
+    payload = await _call_provider(params)
+
+    hourly = payload.get("hourly")
+    if not isinstance(hourly, dict) or not isinstance(hourly.get("time"), list):
+        raise ExternalServiceError(
+            "The weather provider returned no hourly history.",
+            details={"provider": settings.WEATHER_PROVIDER},
+        )
+
+    return {
+        "location": _parse_location(payload),
+        "time": hourly.get("time") or [],
+        "temperature": hourly.get("temperature_2m") or [],
+        "humidity": hourly.get("relative_humidity_2m") or [],
+        "wind_speed": hourly.get("wind_speed_10m") or [],
+        "solar_radiation": hourly.get("shortwave_radiation") or [],
+    }
 
 
 def _group_hourly_by_date(

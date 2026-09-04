@@ -202,6 +202,18 @@ class Settings(BaseSettings):
             if label.strip()
         ]
 
+    # ---- Trained model integration --------------------------------------
+    # Paths are relative to backend/ unless absolute.
+    # heat_pipeline.py writes heat_model.joblib into its own directory.
+    ML_MODEL_PATH: str = "../ml/heat_model.joblib"
+    # The pipeline module is imported, not vendored, so that the features
+    # served are produced by the same code that produced the features
+    # trained on. Reimplementing them would drift silently.
+    ML_PIPELINE_PATH: str = "../ml/heat_pipeline.py"
+    # Hourly history fetched per forecast. The pipeline needs at least 14
+    # complete days after daily aggregation; 35 leaves room for gaps.
+    ML_HISTORY_DAYS: int = 35
+
     # ---- Machine learning (used from Phase 13 onwards) ------------------
     MODEL_PATH: str = "ml/models"
 

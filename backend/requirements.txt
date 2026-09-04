@@ -1,4 +1,4 @@
-# HeatSentinal backend -- Phases 1-3
+# HeatSentinal backend -- Phases 1-5 + ML integration
 # Only what the code actually imports today. Later phases append to this file.
 
 # --- Phase 1: FastAPI foundation ---
@@ -19,6 +19,13 @@ httpx==0.28.1
 # required by SHAP in Phase 13 anyway, so this is an early arrival rather
 # than an extra dependency.
 pythermalcomfort==4.4.2
+
+# --- Trained model integration ---
+# Needed to load ml/heat_model.joblib and rebuild the model's 84 features
+# with the pipeline's own engineer_features (imported, not reimplemented).
+pandas==2.3.0
+scikit-learn==1.9.0
+joblib==1.5.0
 
 # --- Testing ---
 pytest==8.3.4

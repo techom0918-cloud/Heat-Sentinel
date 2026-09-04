@@ -42,3 +42,8 @@ data/processed/
 # Temporary
 tmp/
 temp/
+# ML artifacts
+ml/heat_raw_hourly.csv
+ml/*.joblib
+ml/future_risk_predictions.csv
+ml/train_log.txt
