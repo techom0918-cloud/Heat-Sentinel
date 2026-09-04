@@ -1,87 +1,169 @@
-# 🔥 HeatSentinal
+# HeatSentinal
 
-### AI-Powered Human Heat Health Decision & Action Intelligence System
+AI-Powered Human Heat-Health Early Warning & Decision Intelligence System
 
-HeatShield is an AI-powered early-warning and decision-support platform designed to predict human thermal stress, identify vulnerable populations, explain heat-health risks, and recommend optimized interventions during extreme heat events.
+Smart India Hackathon 2026
+PS ID: 26083
+Problem: Extreme Heatwave Early Warning and Human Thermal Stress Index
 
-## 🎯 Core Objective
+## Overview
 
-Move from:
+HeatSentinal transforms extreme-heat weather information into
+human-centric heat-health decision intelligence.
 
-> "How hot will it be?"
+Instead of answering only:
 
-to:
+"How hot will it be?"
 
-> "What will this heat do to people, and what should authorities do about it?"
+HeatSentinal answers:
 
-## 🚀 Core Capabilities
+"What will this heat mean for vulnerable populations,
+where is the risk highest, why is the risk increasing,
+and what action should authorities take?"
 
-- 🌡️ Human thermal stress assessment
-- 🗺️ GIS-based heat-health risk mapping
-- 🤖 AI-based health-risk prediction
-- 👥 Population vulnerability analysis
-- 🔍 Explainable AI
-- 📈 3–5 day risk forecasting
-- 🔥 Heat Action Simulator
-- 🧠 AI intervention recommendations
-- 📢 Automated alerts
+## Core Workflow
 
-## 🏗️ Architecture
+PREDICT
+  ↓
+EXPLAIN
+  ↓
+FORECAST
+  ↓
+MAP
+  ↓
+SIMULATE
+  ↓
+OPTIMIZE
+  ↓
+ALERT
+  ↓
+VALIDATE
 
-Weather + Demographics + Health Data
-↓
+## System Architecture
+
+Weather + Historical Climate
+        +
+Population / Vulnerability
+        +
+Health / Mortality Data
+        ↓
+Data Processing
+        ↓
 Thermal Stress Engine
-↓
+HI + WBGT + UTCI
+        ↓
 Human Vulnerability Engine
-↓
-AI Risk Prediction
-↓
-Explainable AI
-↓
-Intervention Simulation
-↓
-Recommended Action Plan
+        ↓
+AI / ML Risk Prediction
+        ↓
+Explainable AI / SHAP
+        ↓
+Risk Forecast & Trajectory
+        ↓
+Hyperlocal GIS
+        ↓
+Heat Action Simulator
+        ↓
+AI Action Optimizer
+        ↓
+Early Warning & Alerts
+        ↓
+Health / Mortality Validation
+        ↓
+Decision Intelligence Dashboard
 
-## 🛠️ Technology Stack
+## Key Capabilities
+
+- Human thermal stress assessment
+- Heat Index, WBGT and UTCI
+- Population vulnerability assessment
+- AI/ML heat-risk prediction
+- Explainable AI using SHAP
+- Risk trajectory and forecasting
+- Hyperlocal GIS risk zones
+- Heat Action Simulator
+- AI Action Optimizer
+- Early warning and alerts
+- Health/mortality validation
+- Decision-intelligence dashboard
+
+## Technology Stack
 
 ### Frontend
 - React
 - TypeScript
 - Vite
 - Tailwind CSS
-- Mapbox GL JS
 - Recharts
+- Mapbox / GIS
 
 ### Backend
 - Python
 - FastAPI
 - Pandas
 - NumPy
+- Pydantic
 
 ### Machine Learning
 - Scikit-learn
 - XGBoost
 - SHAP
-
-### Database
-- PostgreSQL
-- PostGIS
+- Joblib
 
 ### Geospatial
 - GeoPandas
 - Shapely
-- Rasterio
+- GeoJSON
 
-## 👥 Team
+## Backend Status
 
-Team - Tapan - predicting heatwaves, protecting lives
-Members- Om Sreyansh Srivastava- Data pipeline Ai integration / Team lead
-Swapnil Sahu - AI/ ML Model 
-Shivansh- Backend
-Arpita Sethi - Backend/Database
-Radhika garg- Frontend 
-Ansh Rai - Frontend dashboard/ API integration
+All planned backend phases are implemented and integrated.
 
-## 📌 Project Status
+| Phase | Module | Status |
+|---|---|---|
+| 1 | FastAPI Foundation | Complete |
+| 2 | Weather Service | Complete |
+| 3 | Thermal Stress Engine | Complete |
+| 4 | Human Vulnerability Engine | Complete |
+| 5 | Health Risk Engine | Complete |
+| 6 | Explainable AI / SHAP | Complete |
+| 7 | Risk Forecast & Trajectory | Complete |
+| 8 | Hyperlocal GIS | Complete |
+| 9 | Heat Action Simulator | Complete |
+| 10 | AI Action Optimizer | Complete |
+| 11 | Early Warning & Alerts | Complete |
+| 12 | Health / Mortality Validation | Complete |
+| 13 | Decision Intelligence Integration | Complete |
+| 14 | Testing & Validation | Complete |
+| 15 | Deployment / Production Readiness | Complete |
 
-🚧 Under Development
+## Scientific Integrity
+
+HeatSentinal distinguishes between:
+
+- Observed data
+- ML predictions
+- Vulnerability estimates
+- Modelled intervention effects
+- Validation data
+
+The system does not present prototype scores as medical diagnosis
+and does not claim causal deaths prevented or mortality reduction
+from intervention simulation.
+
+## Project Team
+
+- Om Sreyansh Srivastava — Data Pipeline / AI Integration / Team Lead
+- Swapnil Sahu — AI / ML Model
+- Shivansh — Backend
+- Arpita Sethi — Backend / Database
+- Radhika Garg — Frontend
+- Ansh Rai — Frontend Dashboard / API Integration
+- Tapan — Heatwave Prediction / Project Team
+
+## Running the Backend
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+uvicorn app.main:app --reload
