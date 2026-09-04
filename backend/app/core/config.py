@@ -52,6 +52,37 @@ class Settings(BaseSettings):
     # Upper bound accepted by /weather/forecast and /forecast/risk.
     WEATHER_FORECAST_MAX_DAYS: int = 5
 
+    # ---- Thermal stress engine (Phase 3) --------------------------------
+    # Heat Index category edges in Celsius, matching heat_pipeline.py.
+    # PROTOTYPE bands, not a medical classification -- configurable so they
+    # can be recalibrated against Indian heat-mortality data later.
+    HEAT_INDEX_BOUNDS_C: str = "27,32,41,54"
+    HEAT_INDEX_CATEGORIES: str = "LOW,MODERATE,HIGH,VERY_HIGH,EXTREME"
+
+    # UTCI model applicability limits (pythermalcomfort / ISB Commission 6).
+    UTCI_WIND_MIN_MS: float = 0.5
+    UTCI_WIND_MAX_MS: float = 17.0
+    UTCI_TEMP_MIN_C: float = -50.0
+    UTCI_TEMP_MAX_C: float = 50.0
+
+    @property
+    def heat_index_bounds_list(self) -> list[float]:
+        """Heat Index category edges, ascending."""
+        return [
+            float(edge.strip())
+            for edge in self.HEAT_INDEX_BOUNDS_C.split(",")
+            if edge.strip()
+        ]
+
+    @property
+    def heat_index_categories_list(self) -> list[str]:
+        """Heat Index category labels. One more label than there are edges."""
+        return [
+            label.strip()
+            for label in self.HEAT_INDEX_CATEGORIES.split(",")
+            if label.strip()
+        ]
+
     # ---- Machine learning (used from Phase 13 onwards) ------------------
     MODEL_PATH: str = "ml/models"
 

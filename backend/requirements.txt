@@ -1,4 +1,4 @@
-# HeatSentinal backend -- Phases 1-2
+# HeatSentinal backend -- Phases 1-3
 # Only what the code actually imports today. Later phases append to this file.
 
 # --- Phase 1: FastAPI foundation ---
@@ -13,17 +13,24 @@ python-dotenv==1.0.1
 # provider cannot block the event loop.
 httpx==0.28.1
 
+# --- Phase 3: thermal stress engine ---
+# Reference implementation of the UTCI polynomial (ISB Commission 6).
+# Pulls in numpy, scipy, numba and llvmlite -- numba and llvmlite are
+# required by SHAP in Phase 13 anyway, so this is an early arrival rather
+# than an extra dependency.
+pythermalcomfort==4.4.2
+
 # --- Testing ---
 pytest==8.3.4
 
-# --- Phase 3-5 (data + scoring) ---
+# --- Phase 4-5 (data + scoring) ---
 # pandas==2.2.3
-# numpy==2.2.1
+# numpy is installed transitively by pythermalcomfort (<2.3)
 
 # --- Phase 13 (ML) ---
 # scikit-learn==1.6.0
 # xgboost==2.1.3
-# shap==0.46.0
+# shap==0.46.0        # also needs numba + llvmlite, already present
 # joblib==1.4.2
 
 # --- Phase 8 (geospatial) -- install last, wheels are heavy on Windows ---
