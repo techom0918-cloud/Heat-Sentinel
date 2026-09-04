@@ -256,7 +256,13 @@ class Settings(BaseSettings):
     # Stored as a plain comma-separated string on purpose. pydantic-settings
     # tries to JSON-decode list-typed fields, which makes a normal
     # `CORS_ORIGINS=a,b` line in .env blow up. Parsing happens below instead.
-    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
+    CORS_ORIGINS: str = (
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:8000,http://127.0.0.1:8000,"
+        "http://localhost:8080,http://127.0.0.1:8080,"
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:5500,http://127.0.0.1:5500"
+    )
 
     @property
     def cors_origins_list(self) -> list[str]:
