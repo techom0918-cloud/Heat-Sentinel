@@ -2,177 +2,535 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Heat Sentinel - Ward Risk Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heat Sentinel — AI Heat Health GIS Intelligence Platform</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet GIS CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
     <style>
-        body { margin: 0; padding: 0; }
-        #map { height: 100vh; width: 100%; }
+        :root {
+            --bg-main: #0F172A;
+            --bg-card: #1E293B;
+            --bg-card-hover: #334155;
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --text-muted: #64748B;
+            --accent-blue: #38BDF8;
+            --accent-blue-bg: rgba(56, 189, 248, 0.12);
+            --border-color: #334155;
+            
+            --risk-low: #10B981;
+            --risk-moderate: #F59E0B;
+            --risk-high: #F97316;
+            --risk-veryhigh: #EF4444;
+            --risk-extreme: #B91C1C;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Top Header Navigation */
+        .app-header {
+            height: 64px;
+            background-color: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+            flex-shrink: 0;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            font-size: 24px;
+            filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.5));
+        }
+
+        .brand-title {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #F8FAFC 0%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-subtitle {
+            font-size: 11px;
+            color: var(--accent-blue);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .location-tag {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        /* Status Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-online {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34D399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge-offline {
+            background: rgba(239, 68, 68, 0.15);
+            color: #F87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: #FBBF24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+        .status-dot.online { background: #34D399; box-shadow: 0 0 6px #34D399; }
+        .status-dot.offline { background: #F87171; box-shadow: 0 0 6px #F87171; }
+        .status-dot.warning { background: #FBBF24; box-shadow: 0 0 6px #FBBF24; }
+
+        /* Main Dashboard Workspace */
+        .app-workspace {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Left Analytics Sidebar Drawer */
+        .sidebar {
+            width: 420px;
+            background-color: var(--bg-main);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            z-index: 500;
+            transition: transform 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .sidebar-section {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        /* Day Selector Controls Toolbar */
+        .day-selector-container {
+            background: var(--bg-card);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .day-selector-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+
+        .day-buttons-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .day-btn {
+            background: var(--bg-main);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .day-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--text-primary);
+        }
+
+        .day-btn.active {
+            background: var(--accent-blue);
+            color: #0F172A;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+        }
+
+        /* Dashboard Cards */
+        .dash-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 14px;
+            transition: border-color 0.2s ease;
+        }
+
+        .dash-card:hover {
+            border-color: #475569;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .card-icon {
+            font-size: 16px;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .metric-box {
+            background: var(--bg-main);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 10px 12px;
+            border-radius: 8px;
+        }
+
+        .metric-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .metric-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        /* Category Badges */
+        .category-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .cat-low { background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid #10B981; }
+        .cat-moderate { background: rgba(245, 158, 11, 0.2); color: #FBBF24; border: 1px solid #F59E0B; }
+        .cat-high { background: rgba(249, 115, 22, 0.2); color: #FB923C; border: 1px solid #F97316; }
+        .cat-very_high, .cat-extreme { background: rgba(239, 68, 68, 0.2); color: #F87171; border: 1px solid #EF4444; }
+
+        /* Main Map Viewport */
+        .map-viewport {
+            flex: 1;
+            position: relative;
+            background: #020617;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Offline / Error Banner */
+        .error-banner {
+            background: linear-gradient(135deg, #7F1D1D 0%, #991B1B 100%);
+            color: #FEE2E2;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #B91C1C;
+        }
+
+        .retry-btn {
+            background: #FFFFFF;
+            color: #991B1B;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        /* Fullscreen Loading Overlay */
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(6px);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(56, 189, 248, 0.2);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Mobile Drawer Toggle */
+        .mobile-toggle-btn {
+            display: none;
+            position: absolute;
+            bottom: 24px;
+            left: 20px;
+            z-index: 1500;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 12px 18px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+
+        /* Responsive Layout Adjustments */
+        @media (max-width: 900px) {
+            .app-workspace {
+                flex-direction: column-reverse;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: 50vh;
+                border-right: none;
+                border-top: 1px solid var(--border-color);
+            }
+
+            .map-viewport {
+                height: 50vh;
+            }
+
+            .mobile-toggle-btn {
+                display: block;
+            }
+        }
     </style>
 </head>
 <body>
 
-    <div id="map"></div>
+    <!-- Error / Offline Banner -->
+    <div id="error-banner" class="error-banner">
+        <span id="error-message">Backend unavailable — unable to load live heat-risk data.</span>
+        <button id="retry-btn" class="retry-btn">Retry Connection</button>
+    </div>
 
+    <!-- Header Navbar -->
+    <header class="app-header">
+        <div class="header-brand">
+            <span class="brand-logo">🔥</span>
+            <div>
+                <div class="brand-title">Heat Sentinel</div>
+                <div class="brand-subtitle">AI Heat-Health GIS Intelligence</div>
+            </div>
+        </div>
+
+        <div class="header-controls">
+            <div class="location-tag">
+                <span>📍</span>
+                <span>Delhi (28.61° N, 77.21° E)</span>
+            </div>
+            <div id="connection-status" class="badge badge-online">
+                <span class="status-dot online"></span> Connecting...
+            </div>
+            <div id="model-status-badge" class="badge badge-warning">
+                <span class="status-dot warning"></span> Model Checking...
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="app-workspace">
+        
+        <!-- Left Analytics Sidebar Drawer -->
+        <aside id="sidebar" class="sidebar">
+            
+            <!-- Day Selector Control Toolbar -->
+            <div class="day-selector-container">
+                <div class="day-selector-label">Forecast Lead Horizon</div>
+                <div class="day-buttons-grid">
+                    <button class="day-btn active" data-day="0">Today</button>
+                    <button class="day-btn" data-day="1">+1 Day</button>
+                    <button class="day-btn" data-day="2">+2 Days</button>
+                    <button class="day-btn" data-day="3">+3 Days (ML)</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                
+                <!-- Weather Card -->
+                <div class="dash-card">
+                    <div class="card-header">
+                        <span class="card-icon">🌤️</span>
+                        <span>Weather Conditions</span>
+                    </div>
+                    <div id="weather-desc" style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">Loading observations...</div>
+                    <div class="metrics-grid">
+                        <div class="metric-box">
+                            <div class="metric-label">Air Temperature</div>
+                            <div id="val-temp" class="metric-value">-- °C</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Relative Humidity</div>
+                            <div id="val-humidity" class="metric-value">-- %</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Wind Speed</div>
+                            <div id="val-wind" class="metric-value">-- m/s</div>
+                        </div>
+                        <div class="metric-box">
+                            <div class="metric-label">Solar Irradiance</div>
+                            <div id="val-solar" class="metric-value">-- W/m²</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Thermal Stress Card -->
+                <div class="dash-card">
+                    <div class="card-header">
+                        <span class="card-icon">🌡️</span>
+                        <span>Human Thermal Stress Indices</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div class="metric-box" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div class="metric-label">US NWS Heat Index</div>
+                                <div id="val-hi" class="metric-value">-- °C</div>
+                            </div>
+                            <span id="cat-hi" class="category-badge cat-low">--</span>
+                        </div>
+                        <div class="metric-box" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div class="metric-label">Shade WBGT Approx</div>
+                                <div id="val-wbgt" class="metric-value">-- °C</div>
+                            </div>
+                            <span class="category-badge" style="background: rgba(255,255,255,0.05); color: #94A3B8;">Shade</span>
+                        </div>
+                        <div class="metric-box" style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div class="metric-label">UTCI (Universal Climate)</div>
+                                <div id="val-utci" class="metric-value">-- °C</div>
+                            </div>
+                            <span id="cat-utci" class="category-badge cat-low">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI ML Hazard Prediction Card -->
+                <div id="ml-prediction-card" class="dash-card">
+                    <div class="card-header">
+                        <span class="card-icon">🤖</span>
+                        <span>ML Risk Forecast</span>
+                    </div>
+                    <div style="font-size: 13px; color: var(--text-muted);">Fetching model forecast...</div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- Main GIS Map Viewport -->
+        <main class="map-viewport">
+            <div id="map"></div>
+        </main>
+
+    </div>
+
+    <!-- Fullscreen Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <div style="font-size: 14px; font-weight: 600; color: #F8FAFC;">Loading Heat Sentinel GIS Intelligence...</div>
+    </div>
+
+    <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-    <script>
-        // Initialize map centered on Delhi (change coordinates to your target city)
-        const map = L.map('map').setView([28.6139, 77.2090], 12);
-
-        // Add the base map tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-
-        // Dummy ward data (replace with real GeoJSON later)
-const wards = [
-    {
-        name: "Ward 1 - Connaught Place",
-        forecast: ["Extreme", "High", "High", "Moderate", "Moderate", "Low"],
-        coords: [[28.635, 77.215], [28.635, 77.225], [28.625, 77.225], [28.625, 77.215]]
-    },
-    {
-        name: "Ward 2 - Karol Bagh",
-        forecast: ["High", "Extreme", "Extreme", "High", "Moderate", "Moderate"],
-        coords: [[28.655, 77.185], [28.655, 77.195], [28.645, 77.195], [28.645, 77.185]]
-    },
-    {
-        name: "Ward 3 - Dwarka",
-        forecast: ["Moderate", "Moderate", "High", "High", "Extreme", "High"],
-        coords: [[28.595, 77.035], [28.595, 77.055], [28.575, 77.055], [28.575, 77.035]]
-    },
-    {
-        name: "Ward 4 - Rohini",
-        forecast: ["Low", "Low", "Moderate", "Moderate", "Moderate", "High"],
-        coords: [[28.735, 77.105], [28.735, 77.125], [28.715, 77.125], [28.715, 77.105]]
-    }
-];
-
-let currentDay = 0; // 0 = Today, 1 = +1 day, etc.
-let wardLayers = []; // stores each polygon so we can update it later
-
-// Color mapping for each risk level
-function getColor(risk) {
-    const colors = {
-        "Low": "green",
-        "Moderate": "gold",
-        "High": "orange",
-        "Extreme": "red"
-    };
-    return colors[risk] || "gray";
-}
-
-// Draw each ward as a colored polygon
-// Draw each ward as a colored polygon
-wards.forEach(ward => {
-    const risk = ward.forecast[currentDay];
-    const polygon = L.polygon(ward.coords, {
-        color: 'white',
-        weight: 1,
-        fillColor: getColor(risk),
-        fillOpacity: 0.6
-    }).addTo(map);
-
-    polygon.bindPopup(`<b>${ward.name}</b><br>Risk Level: ${risk}`);
-    wardLayers.push(polygon);
-});
-
-// Updates all ward colors/popups when the selected day changes
-function updateWards(dayIndex) {
-    currentDay = dayIndex;
-    wards.forEach((ward, i) => {
-        const risk = ward.forecast[dayIndex];
-        wardLayers[i].setStyle({ fillColor: getColor(risk) });
-        wardLayers[i].setPopupContent(`<b>${ward.name}</b><br>Risk Level: ${risk}`);
-    });
-}
-
-// Add a color legend to the map
-const legend = L.control({ position: 'bottomright' });
-
-legend.onAdd = function () {
-    const div = L.DomUtil.create('div', 'legend');
-    div.style.background = 'white';
-    div.style.padding = '10px';
-    div.style.borderRadius = '8px';
-    div.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
-    div.style.fontFamily = 'Arial, sans-serif';
-    div.style.fontSize = '13px';
-
-    const risks = ['Low', 'Moderate', 'High', 'Extreme'];
-    let html = '<b>Risk Level</b><br>';
-
-    risks.forEach(risk => {
-        html += `<i style="background:${getColor(risk)}; width:14px; height:14px; display:inline-block; margin-right:6px; border-radius:3px;"></i>${risk}<br>`;
-    });
-
-    div.innerHTML = html;
-    return div;
-};
-
-legend.addTo(map);
-// Add day selector control
-const dayControl = L.control({ position: 'topright' });
-
-dayControl.onAdd = function () {
-    const div = L.DomUtil.create('div', 'day-selector');
-    div.style.background = 'white';
-    div.style.padding = '8px';
-    div.style.borderRadius = '8px';
-    div.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
-    div.style.fontFamily = 'Arial, sans-serif';
-
-    const labels = ['Today', '+1', '+2', '+3'];
-    let html = '<b>Forecast Day</b><br>';
-
-    labels.forEach((label, i) => {
-        html += `<button onclick="updateWards(${i})" style="margin:3px; padding:4px 8px; cursor:pointer;">${label}</button>`;
-    });
-
-    div.innerHTML = html;
-    L.DomEvent.disableClickPropagation(div);
-    return div;
-};
-
-dayControl.addTo(map);
-// Load real transit heat exposure data
-Papa.parse('data/transit_stops refined.csv', {
-    download: true,
-    header: true,
-    dynamicTyping: true,
-
-    complete: function(results) {
-        const stops = results.data.filter(
-            row => row.city === 'Delhi' && row.lat && row.lon
-        );
-
-        stops.forEach(stop => {
-            const color = getColor(stop.thei_tier);
-
-            L.circleMarker([stop.lat, stop.lon], {
-                radius: 5,
-                fillColor: color,
-                color: 'white',
-                weight: 1,
-                fillOpacity: 0.8
-            })
-            .addTo(map)
-            .bindPopup(`
-                <b>${stop.name}</b><br>
-                Mode: ${stop.mode}<br>
-                THEI Score: ${stop.thei}<br>
-                Risk: ${stop.thei_tier}
-            `);
-        });
-
-        console.log(`Loaded ${stops.length} real Delhi transit stops`);
-    },
-
-    error: function(error) {
-        console.error("Error loading refined dataset:", error);
-    }
-});
-    </script>
-
+    <script src="js/api.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/app.js"></script>
 </body>
 </html>

@@ -47,6 +47,9 @@ ml/heat_raw_hourly.csv
 ml/*.joblib
 ml/future_risk_predictions.csv
 ml/train_log.txt
+heat_raw_hourly.csv
+future_risk_predictions.csv
+heat_model.joblib
 
 # ML artifacts - regenerable, too large for git
 ml/heat_raw_hourly.csv
