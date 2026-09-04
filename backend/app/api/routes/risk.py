@@ -10,13 +10,19 @@ from fastapi import APIRouter, Query
 
 from app.models.common import ErrorResponse
 from app.models.hazard import (
+    Explanation,
     HazardForecastResponse,
     ModelInfo,
     ModelStatusResponse,
 )
 from app.models.risk import RiskPredictionRequest, RiskPredictionResponse
 from app.core.config import settings
-from app.services import ml_service, risk_service, weather_service
+from app.services import (
+    explainability_service,
+    ml_service,
+    risk_service,
+    weather_service,
+)
 
 router = APIRouter(prefix="/risk", tags=["Health Risk"])
 
@@ -151,6 +157,12 @@ Trained on Delhi, Bengaluru, Kochi, Ahmedabad, Nagpur and Kolkata only.
 `current_category` is the persistence baseline — compare it against
 `predicted_category` to see what the model is actually adding.
 
+**`explain=true`** adds a SHAP explanation of *this* prediction: the
+features that pushed the model toward the forecast category, ranked by
+absolute contribution. It is opt-in because SHAP is the expensive part of
+the request. SHAP describes how the fitted model weighted its inputs — it is
+**not a causal claim** and not a medical assessment.
+
 Returns **503** when no trained artifact is present.
 """
 
@@ -169,6 +181,27 @@ Returns **503** when no trained artifact is present.
 async def hazard_forecast(
     latitude: LatitudeQuery,
     longitude: LongitudeQuery,
+    explain: Annotated[
+        bool,
+        Query(
+            description=(
+                "Include a SHAP explanation of the prediction. Opt-in "
+                "because SHAP is the expensive part of the request."
+            )
+        ),
+    ] = False,
+    top_factors: Annotated[
+        int,
+        Query(
+            ge=1,
+            le=100,
+            description=(
+                "How many ranked factors to return when explaining. The "
+                "model has 84 features, so 84 returns the complete "
+                "attribution."
+            ),
+        ),
+    ] = 10,
 ) -> HazardForecastResponse:
     # Fails fast with 503 before spending a provider call.
     info = ml_service.model_info()
@@ -178,9 +211,26 @@ async def hazard_forecast(
     )
     prediction = ml_service.forecast_from_history(history)
 
+    # The design matrix is internal plumbing, not part of the response.
+    design = prediction.pop("_design")
+
+    explanation = None
+    if explain:
+        # Explains the prediction already made above. It is never recomputed
+        # or overridden here -- the model remains the source of truth.
+        explanation = Explanation(
+            **explainability_service.explain_prediction(
+                design=design,
+                class_index=prediction["predicted_class_index"],
+                predicted_category=prediction["predicted_category"],
+                top_n=top_factors,
+            )
+        )
+
     return HazardForecastResponse(
         location=history["location"].model_dump(),
         model_info=ModelInfo(**info),
+        explanation=explanation,
         limitations=ml_service.MODEL_LIMITATIONS,
         disclaimer=ml_service.MODEL_DISCLAIMER,
         **prediction,
@@ -207,8 +257,14 @@ async def model_status() -> ModelStatusResponse:
                 "POST /api/v1/risk/predict is unaffected."
             ),
         )
+    explainer = explainability_service.explainer_is_available()
     return ModelStatusResponse(
         available=True,
-        detail="Trained model loaded.",
+        detail=(
+            "Trained model loaded. SHAP explanations available."
+            if explainer
+            else "Trained model loaded. SHAP explanations unavailable."
+        ),
+        explainer_available=explainer,
         model_info=ModelInfo(**ml_service.model_info()),
     )

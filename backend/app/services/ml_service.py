@@ -264,6 +264,10 @@ def forecast_from_history(history: dict[str, Any]) -> dict[str, Any]:
         "current_category": levels[int(row["cat_today"])],
         "current_heat_index_max": round(float(row["heat_index_max"]), 1),
         "days_of_history_used": int(len(features)),
+        # Private. The caller pops this before building the response. Exposed
+        # so the explainability service can attribute SHAP values to the exact
+        # vector the model scored, rather than rebuilding it and risking drift.
+        "_design": design,
     }
 
 

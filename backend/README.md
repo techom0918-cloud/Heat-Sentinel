@@ -15,7 +15,8 @@ Smart India Hackathon 2026
 | 3 | Thermal stress engine (Heat Index, WBGT, UTCI) | ✅ Complete |
 | 4 | Human vulnerability engine | ✅ Complete |
 | 5 | Health risk engine | ✅ Complete |
-| 6–15 | XAI, forecast, zones, simulator, optimizer, alerts, ML, tests, docs | ⬜ Not started |
+| 6 | Explainable AI (SHAP) | ✅ Complete |
+| 7–15 | Forecast, zones, simulator, optimizer, alerts, tests, docs | ⬜ Not started |
 
 ---
 
@@ -632,6 +633,90 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/risk/predict" `
 
 `contributors` sum to `risk_score`, so a dashboard can show exactly why a
 location scored as it did.
+
+---
+
+## Phase 6 — Explainable AI (SHAP)
+
+### PREDICT → EXPLAIN
+
+```
+PREDICT   ml_service        84 features -> 3-day heat hazard category
+EXPLAIN   explainability_service   SHAP -> which features drove THAT class
+```
+
+The model stays the source of truth. SHAP never re-predicts, never rescores,
+and never alters a forecast — a test asserts `explainability_service` calls
+neither `predict` nor `predict_proba`.
+
+### Usage
+
+Opt-in, because SHAP is the expensive part of the request:
+
+```
+GET /api/v1/risk/forecast?latitude=28.6139&longitude=77.2090&explain=true
+```
+
+`top_factors` (1–100, default 10) controls how many ranked factors come
+back. The model has 84 features, so `top_factors=84` returns the complete
+attribution.
+
+### Example
+
+**Prediction:** `EXTREME` (confidence 0.99)
+
+**Main drivers:**
+
+| # | Feature | Value | SHAP | Direction |
+|---|---|---|---|---|
+| 1 | mean heat index | 70.6 | +0.708 | increases_risk |
+| 2 | peak WBGT 2 days earlier | 41.9 | +0.672 | increases_risk |
+| 3 | 7-day average peak UTCI | 66.4 | +0.664 | increases_risk |
+| 4 | peak heat index | 93.8 | +0.626 | increases_risk |
+| 5 | 3-day average peak heat index | 93.7 | +0.465 | increases_risk |
+| 6 | consecutive hot days | 35.0 | −0.428 | decreases_risk |
+
+**Generated summary:**
+
+> The model's EXTREME forecast is driven mainly by heat index, wet-bulb globe
+> temperature, UTCI thermal stress and temperature. Moderating the forecast:
+> recent heat persistence and humidity.
+
+Summaries are built deterministically from the ranked themes — no LLM, no
+randomness. The same factors always produce the same sentence.
+
+### Multiclass handling
+
+The model has five classes, and SHAP's output shape varies by library and
+estimator version. `_normalise_shap_output` handles:
+
+- `Explanation` objects (unwrapped, then recursed)
+- lists of per-class arrays (older SHAP)
+- 3D arrays as `(samples, features, classes)` **or** `(classes, samples, features)`
+- 2D arrays (binary/single output)
+
+Contributions are attributed to the **predicted class only**. Class
+contributions are never summed together. Where an axis mapping is ambiguous
+the service raises rather than guessing — a wrong axis would produce a
+plausible-looking explanation of the wrong class.
+
+### Performance
+
+The `TreeExplainer` is built once and cached (`lru_cache`), reusing the
+estimator `ml_service` already loaded. The artifact is never re-read per
+request, and SHAP runs only when `explain=true`.
+
+### What SHAP is and is not
+
+A SHAP value here is a signed contribution, in the model's output space, of
+one feature toward the predicted class for one input, relative to the
+explainer's base value.
+
+**These are not causal claims.** SHAP describes how this fitted model
+weighted its inputs. It does not establish that a feature causes heat, harm
+or any health outcome. The model was trained on meteorological variables
+only — no mortality, demographic or health data. Every explanation carries
+this caveat in its `caveat` field.
 
 ---
 
