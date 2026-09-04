@@ -77,11 +77,28 @@ def _daily_from_hourly(history: dict[str, Any]) -> Any:
             status_code=422,
         )
 
+    temperature = history.get("temperature") or []
+    humidity = history.get("humidity") or []
+    # A provider that returns series of differing lengths would otherwise
+    # surface as a raw pandas ValueError (a 500 with a traceback) instead of
+    # the project's error envelope. Same treatment as the empty-series case.
+    if not len(temperature) == len(humidity) == len(times):
+        raise ExternalServiceError(
+            "The weather provider returned hourly series of differing "
+            "lengths.",
+            status_code=422,
+            details={
+                "time": len(times),
+                "temperature": len(temperature),
+                "humidity": len(humidity),
+            },
+        )
+
     frame = pd.DataFrame(
         {
             "timestamp": pd.to_datetime(times),
-            "temperature": history.get("temperature") or [],
-            "humidity": history.get("humidity") or [],
+            "temperature": temperature,
+            "humidity": humidity,
         }
     )
     frame = frame.dropna(subset=["temperature", "humidity"])

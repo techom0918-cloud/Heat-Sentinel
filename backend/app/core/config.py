@@ -312,6 +312,72 @@ class Settings(BaseSettings):
             },
         }
 
+    # ---- Early warning & alerts (Phase 11) -------------------------------
+    # The 5-band scale produced by the trained model / Phase 7 trajectory
+    # (heat HAZARD categories: LOW..EXTREME). Alerts are evaluated on this
+    # scale, not the 4-band Phase 5 combined-risk scale, because the
+    # trajectory is what actually carries a forecast peak and a peak date.
+    ALERT_LEVELS: str = "LOW,MODERATE,HIGH,VERY_HIGH,EXTREME"
+    # Alert is required once the forecast peak reaches this level or above.
+    # An escalation (today's level vs. the peak) below this threshold is
+    # still detected and reported, but does not independently force an
+    # alert -- see alert_service.evaluate_alert.
+    ALERT_MIN_LEVEL: str = "HIGH"
+    # Vulnerability level (Phase 4 scale) at/above which alert priority is
+    # escalated, per the "high heat + high vulnerability" rule.
+    ALERT_HIGH_VULNERABILITY_LEVELS: str = "HIGH,EXTREME"
+
+    @property
+    def alert_levels_list(self) -> list[str]:
+        return [
+            label.strip()
+            for label in self.ALERT_LEVELS.split(",")
+            if label.strip()
+        ]
+
+    @property
+    def alert_high_vulnerability_levels_list(self) -> list[str]:
+        return [
+            label.strip()
+            for label in self.ALERT_HIGH_VULNERABILITY_LEVELS.split(",")
+            if label.strip()
+        ]
+
+    @property
+    def alert_recommended_actions(self) -> dict[str, list[str]]:
+        """Decision-support action text per alert level. Not medical advice."""
+        return {
+            "LOW": [],
+            "MODERATE": ["Monitor the forecast for further escalation."],
+            "HIGH": [
+                "Activate cooling centers",
+                "Issue public heat advisory",
+                "Review outdoor work schedules",
+            ],
+            "VERY_HIGH": [
+                "Activate cooling centers",
+                "Issue public heat warning",
+                "Review outdoor work restrictions",
+                "Prioritise water distribution in high-vulnerability zones",
+            ],
+            "EXTREME": [
+                "Activate cooling centers",
+                "Issue public heat warning",
+                "Review outdoor work restrictions",
+                "Prioritise water distribution in high-vulnerability zones",
+                "Coordinate with local health authorities",
+            ],
+        }
+
+    # ---- Health / mortality data integration (Phase 12) ------------------
+    # Relative to backend/ unless absolute. REAL government-reported data
+    # (see the file's own `source` column), not synthetic.
+    HEALTH_DATA_CSV_PATH: str = "data/heat_wave_deaths_india_2018_2022.csv"
+    # A state-year is labelled an observed "high-risk event" once reported
+    # deaths reach this count. PROTOTYPE THRESHOLD, not an epidemiological
+    # cut-off -- configurable so it can be recalibrated.
+    HEALTH_HIGH_RISK_DEATH_THRESHOLD: int = 50
+
     # ---- Trained model integration --------------------------------------
     # Paths are relative to backend/ unless absolute.
     # heat_pipeline.py writes heat_model.joblib into its own directory.

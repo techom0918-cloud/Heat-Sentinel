@@ -209,3 +209,26 @@ def test_insufficient_history_fails_cleanly(client: TestClient, with_model) -> N
 def test_forecast_endpoint_in_schema(client: TestClient) -> None:
     schema = client.get("/openapi.json").json()
     assert "/api/v1/forecast/risk" in schema["paths"]
+
+
+def test_ragged_provider_series_returns_the_error_envelope(
+    client: TestClient, with_model
+) -> None:
+    """A malformed provider response must not escape as a pandas 500.
+
+    `time`, `temperature` and `humidity` are separate arrays in the provider
+    payload. If they disagree in length, building the frame raises a raw
+    ValueError, which reaches the client as a 500 with a traceback instead of
+    the project's one error envelope.
+    """
+    payload = hourly_payload()
+    payload["hourly"]["temperature_2m"] = payload["hourly"]["temperature_2m"][:-5]
+
+    with mock_provider(payload):
+        response = client.get(
+            f"{settings.API_V1_PREFIX}/forecast/risk",
+            params={"latitude": 28.61, "longitude": 77.21, "days": 5},
+        )
+
+    assert response.status_code == 422
+    assert "error" in response.json()
