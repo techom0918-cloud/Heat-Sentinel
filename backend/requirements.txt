@@ -34,14 +34,26 @@ shap>=0.46,<0.53
 
 # --- Testing ---
 pytest==8.3.4
+# tests/test_explainability.py's four_class_artifact fixture (Phase 6)
+# builds a real XGBClassifier to exercise the "trained on fewer classes
+# than risk_levels lists" case. Test-time only -- nothing in app/ imports
+# it -- but without it `pytest` cannot even collect that file. Pinning it
+# here (pulled forward from the Phase 13 placeholder below) so
+# `pip install -r requirements.txt && pytest` passes cleanly with no
+# separate manual install. Pre-existing gap, unrelated to Phases 11-12.
+xgboost==3.2.0
 
 # --- Phase 4-5 (data + scoring) ---
 # pandas==2.2.3
 # numpy is installed transitively by pythermalcomfort (<2.3)
 
+# --- Phase 11-12 (alerts, health data) ---
+# No new dependencies. alert_service and health_data_service are pure
+# Python + the standard library (csv) on top of what Phases 1-9 already
+# installed.
+
 # --- Phase 13 (ML) ---
 # scikit-learn==1.6.0
-# xgboost==2.1.3
 # shap==0.46.0        # also needs numba + llvmlite, already present
 # joblib==1.4.2
 
