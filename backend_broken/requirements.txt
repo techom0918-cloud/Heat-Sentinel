@@ -1,20 +1,18 @@
-# HeatSentinal backend -- Phases 1-2
+# HeatSentinal backend -- Phase 1 (FastAPI foundation)
 # Only what the code actually imports today. Later phases append to this file.
 
-# --- Phase 1: FastAPI foundation ---
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
 pydantic-settings==2.7.0
 python-dotenv==1.0.1
 
-# --- Phase 2: weather service ---
-# httpx is a runtime dependency now, not test-only. Async client, so a slow
-# provider cannot block the event loop.
+# Testing
+pytest==8.3.4
 httpx==0.28.1
 
-# --- Testing ---
-pytest==8.3.4
+# --- Phase 2 (weather service) ---
+# requests==2.32.3
 
 # --- Phase 3-5 (data + scoring) ---
 # pandas==2.2.3

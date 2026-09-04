@@ -40,9 +40,17 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     DEBUG: bool = True
 
-    # ---- External services (used from Phase 2 onwards) ------------------
+    # ---- Weather provider (Phase 2) -------------------------------------
+    WEATHER_PROVIDER: str = "open-meteo"
     WEATHER_API_URL: str = "https://api.open-meteo.com/v1/forecast"
     REQUEST_TIMEOUT_SECONDS: float = 10.0
+
+    # "auto" resolves the local timezone from the coordinates, so daily
+    # aggregates line up with local calendar days rather than UTC days.
+    WEATHER_TIMEZONE: str = "auto"
+
+    # Upper bound accepted by /weather/forecast and /forecast/risk.
+    WEATHER_FORECAST_MAX_DAYS: int = 5
 
     # ---- Machine learning (used from Phase 13 onwards) ------------------
     MODEL_PATH: str = "ml/models"
