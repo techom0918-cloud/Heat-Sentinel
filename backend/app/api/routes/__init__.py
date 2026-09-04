@@ -7,9 +7,11 @@ call. main.py never changes again.
 from fastapi import APIRouter
 
 from app.api.routes import (
+    alerts,
     forecast,
     geospatial,
     health,
+    health_data,
     intervention,
     risk,
     thermal,
@@ -26,9 +28,7 @@ api_router.include_router(risk.router)
 api_router.include_router(forecast.router)
 api_router.include_router(geospatial.router)
 api_router.include_router(intervention.router)
-
-# --- Added in later phases -------------------------------------------------
-# from app.api.routes import alerts
-# api_router.include_router(alerts.router)
+api_router.include_router(alerts.router)
+api_router.include_router(health_data.router)
 
 __all__ = ["api_router"]
