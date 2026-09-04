@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Heat Sentinel - Ward Risk Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize map centered on Delhi (change coordinates to your target city)
+        const map = L.map('map').setView([28.6139, 77.2090], 12);
+
+        // Add the base map tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Dummy ward data (replace with real GeoJSON later)
+const wards = [
+    {
+        name: "Ward 1 - Connaught Place",
+        risk: "Extreme",
+        coords: [[28.635, 77.215], [28.635, 77.225], [28.625, 77.225], [28.625, 77.215]]
+    },
+    {
+        name: "Ward 2 - Karol Bagh",
+        risk: "High",
+        coords: [[28.655, 77.185], [28.655, 77.195], [28.645, 77.195], [28.645, 77.185]]
+    },
+    {
+        name: "Ward 3 - Dwarka",
+        risk: "Moderate",
+        coords: [[28.595, 77.035], [28.595, 77.055], [28.575, 77.055], [28.575, 77.035]]
+    },
+    {
+        name: "Ward 4 - Rohini",
+        risk: "Low",
+        coords: [[28.735, 77.105], [28.735, 77.125], [28.715, 77.125], [28.715, 77.105]]
+    }
+];
+
+// Color mapping for each risk level
+function getColor(risk) {
+    const colors = {
+        "Low": "green",
+        "Moderate": "gold",
+        "High": "orange",
+        "Extreme": "red"
+    };
+    return colors[risk] || "gray";
+}
+
+// Draw each ward as a colored polygon
+wards.forEach(ward => {
+    const polygon = L.polygon(ward.coords, {
+        color: 'white',
+        weight: 1,
+        fillColor: getColor(ward.risk),
+        fillOpacity: 0.6
+    }).addTo(map);
+
+    polygon.bindPopup(`<b>${ward.name}</b><br>Risk Level: ${ward.risk}`);
+});
+
+// Add a color legend to the map
+const legend = L.control({ position: 'bottomright' });
+
+legend.onAdd = function () {
+    const div = L.DomUtil.create('div', 'legend');
+    div.style.background = 'white';
+    div.style.padding = '10px';
+    div.style.borderRadius = '8px';
+    div.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+    div.style.fontFamily = 'Arial, sans-serif';
+    div.style.fontSize = '13px';
+
+    const risks = ['Low', 'Moderate', 'High', 'Extreme'];
+    let html = '<b>Risk Level</b><br>';
+
+    risks.forEach(risk => {
+        html += `<i style="background:${getColor(risk)}; width:14px; height:14px; display:inline-block; margin-right:6px; border-radius:3px;"></i>${risk}<br>`;
+    });
+
+    div.innerHTML = html;
+    return div;
+};
+
+legend.addTo(map);
+    </script>
+
+</body>
+</html>
