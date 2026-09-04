@@ -14,7 +14,7 @@ Smart India Hackathon 2026
 | 2 | Weather service (Open-Meteo) | ✅ Complete |
 | 3 | Thermal stress engine (Heat Index, WBGT, UTCI) | ✅ Complete |
 | 4 | Human vulnerability engine | ✅ Complete |
-| 5 | Health risk engine | ⬜ Not started |
+| 5 | Health risk engine | ✅ Complete |
 | 6–15 | XAI, forecast, zones, simulator, optimizer, alerts, ML, tests, docs | ⬜ Not started |
 
 ---
@@ -71,6 +71,7 @@ uvicorn app.main:app --reload
 | http://127.0.0.1:8000/api/v1/thermal/calculate | Thermal stress (POST) |
 | http://127.0.0.1:8000/api/v1/thermal/current | Weather + thermal stress |
 | http://127.0.0.1:8000/api/v1/vulnerability/calculate | Vulnerability score (POST) |
+| http://127.0.0.1:8000/api/v1/risk/predict | Health risk score (POST) |
 | http://127.0.0.1:8000/docs | Swagger UI |
 | http://127.0.0.1:8000/redoc | ReDoc |
 | http://127.0.0.1:8000/openapi.json | OpenAPI schema |
@@ -494,6 +495,143 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/vulnerability/calculate" `
 
 `contributions` sums to `vulnerability_score`, so the frontend can show
 exactly why an area scored as it did.
+
+---
+
+## Health Risk Engine (Phase 5)
+
+> **This prototype health-risk score is not a medically validated
+> prediction model.**
+
+### Purpose
+
+Combines thermal stress with population vulnerability into one 0–1 risk
+score with per-factor contributions. This layer **consumes** thermal
+indices; it never recalculates them. Index calculation belongs to Phase 3,
+and a test asserts `risk_service.py` does not import `thermal_service`.
+
+### Inputs
+
+| Field | Unit | Range | Source |
+|---|---|---|---|
+| `temperature_c` | °C | −90…60 | weather engine (context only) |
+| `relative_humidity` | % | 0…100 | weather engine (context only) |
+| `wind_speed` | m/s | ≥ 0 | weather engine (context only) |
+| `solar_radiation` | W/m² | ≥ 0, optional | weather engine (context only) |
+| `heat_index` | °C | −100…150 | **thermal engine** |
+| `wbgt` | °C | −50…100 | **thermal engine** |
+| `utci` | °C | −100…100, **optional** | **thermal engine** |
+| `vulnerability_score` | index | 0…1 | **vulnerability engine** |
+
+### Scoring methodology
+
+```
+thermal_stress = Σ (sub-weight × normalised index)
+risk           = 0.65 × thermal_stress + 0.35 × vulnerability
+```
+
+**Normalisation anchors** — each index scaled linearly and clamped:
+
+| Index | Range | Source |
+|---|---|---|
+| Heat Index | 27–54 °C | Phase 3 category edges (prototype bands) |
+| WBGT | 22–35 °C | **Prototype anchors, uncalibrated** |
+| UTCI | 26–46 °C | Published UTCI stress scale (Brode et al. 2012) |
+
+The WBGT anchors are placeholders deliberately. Phase 3 returns
+`NOT_CLASSIFIED` for WBGT because ISO 7243 and ACGIH limits are defined on
+*outdoor* WBGT, not the shade approximation computed here — reusing those
+limits as anchors would contradict that and dress an uncalibrated number in
+borrowed authority. **UTCI is the only index with a documented scale.**
+
+**Prototype weights** (configurable, each group sums to 1.0):
+
+| | Weight |
+|---|---|
+| Thermal stress | 0.65 |
+| Vulnerability | 0.35 |
+| — Heat Index | 0.30 |
+| — WBGT | 0.35 |
+| — UTCI | 0.35 |
+
+**UTCI is optional.** The thermal engine returns no UTCI above 50 °C air
+temperature, which occurs in India. When `utci` is null its weight is
+redistributed proportionally across the remaining indices — dropping it
+instead would shrink `thermal_stress` and understate risk during exactly the
+events this system exists for.
+
+### Thresholds
+
+| Score | Level |
+|---|---|
+| 0.00–0.24 | LOW |
+| 0.25–0.49 | MODERATE |
+| 0.50–0.74 | HIGH |
+| 0.75–1.00 | EXTREME |
+
+Configurable prototype edges, not clinical cut-offs.
+
+### Limitations
+
+- Not a validated prediction model — nothing has been fitted to
+  heat-mortality outcomes.
+- Weights are uncalibrated prototype values chosen for plausibility.
+- WBGT normalisation anchors are placeholders pending calibration.
+- Heat Index and WBGT are strongly correlated, so the weighted mean
+  double-counts temperature and humidity to some degree.
+- Linear and additive — cannot represent interactions such as extreme heat
+  arriving in an already vulnerable district.
+- `risk_probability` is the score echoed, **not** a calibrated probability.
+- `confidence` is always `null` and stays null until a model is trained.
+- `contributors` are arithmetic shares, **not SHAP values**.
+- Describes a population, never an individual.
+
+### Future ML compatibility
+
+`risk_service.predict_risk()` is the seam. XGBoost replaces its body behind
+the same signature and response model; `confidence` then returns a real
+value and `contributors` are swapped for SHAP. Callers do not change.
+
+### `POST /api/v1/risk/predict`
+
+```powershell
+$body = @{
+    temperature_c       = 42.0
+    relative_humidity   = 65.0
+    wind_speed          = 2.5
+    solar_radiation     = 700.0
+    heat_index          = 49.2
+    wbgt                = 31.5
+    utci                = 43.1
+    vulnerability_score = 0.78
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/risk/predict" `
+    -Method Post -ContentType "application/json" -Body $body | ConvertTo-Json -Depth 6
+```
+
+```json
+{
+  "risk_score": 0.7941,
+  "risk_probability": 0.7941,
+  "risk_level": "EXTREME",
+  "confidence": null,
+  "components": { "thermal_stress": 0.8017, "vulnerability": 0.78 },
+  "contributors": [
+    { "factor": "vulnerability", "impact": 0.273, "direction": "increases", "normalised_value": 0.78, "weight": 0.35 },
+    { "factor": "UTCI", "impact": 0.194513, "direction": "increases", "normalised_value": 0.855, "weight": 0.2275 },
+    { "factor": "WBGT", "impact": 0.166269, "direction": "increases", "normalised_value": 0.7308, "weight": 0.2275 },
+    { "factor": "Heat Index", "impact": 0.160333, "direction": "increases", "normalised_value": 0.8222, "weight": 0.195 }
+  ],
+  "normalised_indices": { "heat_index": 0.8222, "wbgt": 0.7308, "utci": 0.855 },
+  "thresholds": { "LOW": 0.25, "MODERATE": 0.5, "HIGH": 0.75, "EXTREME": 1.0 },
+  "limitations": ["..."],
+  "disclaimer": "PROTOTYPE HEALTH-RISK SCORE - NOT A MEDICALLY VALIDATED PREDICTION MODEL..."
+}
+```
+
+`contributors` sum to `risk_score`, so a dashboard can show exactly why a
+location scored as it did.
 
 ---
 

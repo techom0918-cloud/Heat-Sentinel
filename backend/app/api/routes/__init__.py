@@ -6,17 +6,17 @@ call. main.py never changes again.
 
 from fastapi import APIRouter
 
-from app.api.routes import health, thermal, vulnerability, weather
+from app.api.routes import health, risk, thermal, vulnerability, weather
 
 api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(weather.router)
 api_router.include_router(thermal.router)
 api_router.include_router(vulnerability.router)
+api_router.include_router(risk.router)
 
 # --- Added in later phases -------------------------------------------------
-# from app.api.routes import risk, forecast, intervention, alerts
-# api_router.include_router(risk.router)
+# from app.api.routes import forecast, intervention, alerts
 # api_router.include_router(forecast.router)
 # api_router.include_router(intervention.router)
 # api_router.include_router(alerts.router)

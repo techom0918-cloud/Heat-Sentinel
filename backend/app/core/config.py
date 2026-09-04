@@ -140,6 +140,68 @@ class Settings(BaseSettings):
             if label.strip()
         ]
 
+    # ---- Health risk engine (Phase 5) -----------------------------------
+    # PROTOTYPE WEIGHTS. Not medically validated. Top level must sum to 1.0.
+    RISK_WEIGHT_THERMAL: float = 0.65
+    RISK_WEIGHT_VULNERABILITY: float = 0.35
+
+    # Contributions within the thermal block. Must sum to 1.0.
+    RISK_THERMAL_WEIGHT_HEAT_INDEX: float = 0.30
+    RISK_THERMAL_WEIGHT_WBGT: float = 0.35
+    RISK_THERMAL_WEIGHT_UTCI: float = 0.35
+
+    # Normalisation anchors, in degrees Celsius. Each index is scaled
+    # linearly from MIN (0.0) to MAX (1.0) and clamped.
+    #
+    # Heat Index: reuses the Phase 3 category edges (27 = first band above
+    # LOW, 54 = start of EXTREME) rather than inventing new numbers.
+    RISK_HEAT_INDEX_MIN_C: float = 27.0
+    RISK_HEAT_INDEX_MAX_C: float = 54.0
+    #
+    # WBGT: PROTOTYPE ANCHORS, EXPLICITLY UNCALIBRATED. Phase 3 deliberately
+    # returns NOT_CLASSIFIED for WBGT because ISO 7243 and ACGIH limits are
+    # defined on full outdoor WBGT, not the shade approximation computed
+    # here. Using those limits as anchors would contradict that. These are
+    # placeholder values pending calibration.
+    RISK_WBGT_MIN_C: float = 22.0
+    RISK_WBGT_MAX_C: float = 35.0
+    #
+    # UTCI: taken from the published UTCI thermal stress assessment scale
+    # (Brode et al. 2012) -- moderate heat stress begins at +26 C and
+    # extreme heat stress at +46 C. This is the one anchor pair with a
+    # documented source.
+    RISK_UTCI_MIN_C: float = 26.0
+    RISK_UTCI_MAX_C: float = 46.0
+
+    # PROTOTYPE category edges, configurable.
+    RISK_BOUNDS: str = "0.25,0.50,0.75"
+    RISK_CATEGORIES: str = "LOW,MODERATE,HIGH,EXTREME"
+
+    @property
+    def risk_thermal_weights(self) -> dict[str, float]:
+        """Weights within the thermal block."""
+        return {
+            "heat_index": self.RISK_THERMAL_WEIGHT_HEAT_INDEX,
+            "wbgt": self.RISK_THERMAL_WEIGHT_WBGT,
+            "utci": self.RISK_THERMAL_WEIGHT_UTCI,
+        }
+
+    @property
+    def risk_bounds_list(self) -> list[float]:
+        return [
+            float(edge.strip())
+            for edge in self.RISK_BOUNDS.split(",")
+            if edge.strip()
+        ]
+
+    @property
+    def risk_categories_list(self) -> list[str]:
+        return [
+            label.strip()
+            for label in self.RISK_CATEGORIES.split(",")
+            if label.strip()
+        ]
+
     # ---- Machine learning (used from Phase 13 onwards) ------------------
     MODEL_PATH: str = "ml/models"
 
