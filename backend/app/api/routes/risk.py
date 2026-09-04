@@ -126,20 +126,27 @@ service, builds the model's 84 features using the pipeline's *own*
 drift from trained features), and predicts the Heat Index category at
 `based_on + horizon_days`.
 
-**Honest performance.** Held-out test, event = "HIGH or above":
+**Honest performance.** Held-out test, event = "HIGH or above". Model is
+XGBoost, selected on validation CSI against persistence and climatology
+baselines:
 
-| | POD | FAR | CSI | misses |
-|---|---|---|---|---|
-| Persistence baseline | 0.894 | 0.106 | 0.808 | 120 |
-| Model | 0.918 | 0.105 | 0.829 | 93 |
+| | macro-F1 | POD | FAR | CSI | misses |
+|---|---|---|---|---|---|
+| Climatology | 0.496 | 0.860 | 0.238 | 0.679 | — |
+| Persistence | 0.710 | 0.916 | 0.084 | 0.845 | 217 |
+| **XGBoost** | **0.726** | **0.945** | 0.086 | **0.868** | **143** |
 
-A 22% reduction in missed heat events at an equivalent false-alarm rate.
-The improvement is **modest** — on validation, persistence actually scored
-slightly higher than every model tried.
+A **34% reduction in missed heat events** (217 → 143) for 12 additional
+false alarms. The model also beats persistence on macro-F1, so it is better
+at ranking severity, not only at detecting events.
 
-**The EXTREME band is unreachable.** Zero EXTREME days occurred in the
-training, validation or test splits, so the model cannot predict it and its
-skill there is unmeasured. Trained on Delhi, Bengaluru and Kochi only.
+**The EXTREME band is unreachable.** Across six cities, 578,592 hourly
+records and eleven years, no day reached a Heat Index above 54 °C — so zero
+EXTREME days appear in any split. The model cannot predict that band and its
+skill there is unmeasured. VERY_HIGH recall is 0.57, with errors skewing
+toward under-warning.
+
+Trained on Delhi, Bengaluru, Kochi, Ahmedabad, Nagpur and Kolkata only.
 
 `current_category` is the persistence baseline — compare it against
 `predicted_category` to see what the model is actually adding.

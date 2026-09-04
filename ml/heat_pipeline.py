@@ -74,10 +74,13 @@ HEAT_INDEX_EDGES = [27.0, 32.0, 41.0, 54.0]
 
 DO_TUNING = False         # STEP 6 is slow; turn on once the rest works
 
-CITIES = {                # matches the cities in transit_stops.csv
+CITIES = {
     "Delhi": (28.6139, 77.2090),
     "Bengaluru": (12.9716, 77.5946),
     "Kochi": (9.9312, 76.2673),
+    "Ahmedabad": (23.0225, 72.5714),
+    "Nagpur": (21.1458, 79.0882),
+    "Kolkata": (22.5726, 88.3639),
 }
 START_YEAR, END_YEAR = 2015, 2025
 

@@ -43,16 +43,20 @@ logger = logging.getLogger(__name__)
 MODEL_LIMITATIONS = [
     "Predicts a heat HAZARD category, not a health outcome. No mortality, "
     "demographic or health data was used in training.",
-    "The EXTREME band was never observed: zero EXTREME days occurred in the "
-    "training, validation or test splits, so the model cannot predict it and "
-    "its skill on that band is unmeasured.",
-    "Trained on Delhi, Bengaluru and Kochi only (Open-Meteo ERA5 reanalysis, "
-    "2015-2025). Skill elsewhere is unverified.",
-    "On validation the persistence baseline scored slightly higher than every "
-    "model (CSI 0.789 vs 0.783). The improvement on held-out test is modest "
-    "and should be described as such.",
-    "Better at detecting whether a heat event will occur than at ranking its "
-    "severity: test macro-F1 was lower than persistence (0.685 vs 0.737).",
+    "The EXTREME band was never observed. Across six cities, 578,592 hourly "
+    "records and eleven years (2015-2025), no day reached a Heat Index above "
+    "54 C, so zero EXTREME days appear in the training, validation or test "
+    "splits. The model therefore cannot predict that band and its skill "
+    "there is unmeasured.",
+    "Trained on six Indian cities only (Delhi, Bengaluru, Kochi, Ahmedabad, "
+    "Nagpur, Kolkata) from Open-Meteo ERA5 reanalysis, 2015-2025. Skill "
+    "elsewhere is unverified.",
+    "VERY_HIGH recall on held-out test is 0.57: roughly two in five "
+    "VERY_HIGH days are called HIGH instead. Errors skew toward "
+    "under-warning, which is the more dangerous direction.",
+    "The improvement over persistence comes with slightly more false alarms: "
+    "74 fewer missed events in exchange for 12 additional false alarms on "
+    "the test set.",
     "`confidence` is the model's class probability, not a calibrated "
     "forecast probability.",
     "Describes conditions at a location, never an individual.",
@@ -185,8 +189,10 @@ def model_info() -> dict[str, Any]:
             for key, value in metrics.items()
         },
         "trained_on": (
-            "Open-Meteo ERA5 reanalysis, 2015-2025, three Indian cities "
-            "(Delhi, Bengaluru, Kochi). Meteorological variables only."
+            "Open-Meteo ERA5 reanalysis, 2015-2025, six Indian cities "
+            "(Delhi, Bengaluru, Kochi, Ahmedabad, Nagpur, Kolkata). "
+            "578,592 hourly records, 24,012 labelled days. Meteorological "
+            "variables only -- no mortality, demographic or health data."
         ),
     }
 
