@@ -136,12 +136,15 @@ dayControl.onAdd = function () {
 
 dayControl.addTo(map);
 // Load real transit heat exposure data
-Papa.parse('data/transit_stops.csv', {
+Papa.parse('data/transit_stops refined.csv', {
     download: true,
     header: true,
     dynamicTyping: true,
+
     complete: function(results) {
-        const stops = results.data.filter(row => row.city === 'Delhi' && row.lat && row.lon);
+        const stops = results.data.filter(
+            row => row.city === 'Delhi' && row.lat && row.lon
+        );
 
         stops.forEach(stop => {
             const color = getColor(stop.thei_tier);
@@ -154,10 +157,19 @@ Papa.parse('data/transit_stops.csv', {
                 fillOpacity: 0.8
             })
             .addTo(map)
-            .bindPopup(`<b>${stop.name}</b><br>Mode: ${stop.mode}<br>THEI Score: ${stop.thei}<br>Risk: ${stop.thei_tier}`);
+            .bindPopup(`
+                <b>${stop.name}</b><br>
+                Mode: ${stop.mode}<br>
+                THEI Score: ${stop.thei}<br>
+                Risk: ${stop.thei_tier}
+            `);
         });
 
         console.log(`Loaded ${stops.length} real Delhi transit stops`);
+    },
+
+    error: function(error) {
+        console.error("Error loading refined dataset:", error);
     }
 });
     </script>
