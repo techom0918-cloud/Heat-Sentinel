@@ -27,25 +27,28 @@
 const wards = [
     {
         name: "Ward 1 - Connaught Place",
-        risk: "Extreme",
+        forecast: ["Extreme", "High", "High", "Moderate", "Moderate", "Low"],
         coords: [[28.635, 77.215], [28.635, 77.225], [28.625, 77.225], [28.625, 77.215]]
     },
     {
         name: "Ward 2 - Karol Bagh",
-        risk: "High",
+        forecast: ["High", "Extreme", "Extreme", "High", "Moderate", "Moderate"],
         coords: [[28.655, 77.185], [28.655, 77.195], [28.645, 77.195], [28.645, 77.185]]
     },
     {
         name: "Ward 3 - Dwarka",
-        risk: "Moderate",
+        forecast: ["Moderate", "Moderate", "High", "High", "Extreme", "High"],
         coords: [[28.595, 77.035], [28.595, 77.055], [28.575, 77.055], [28.575, 77.035]]
     },
     {
         name: "Ward 4 - Rohini",
-        risk: "Low",
+        forecast: ["Low", "Low", "Moderate", "Moderate", "Moderate", "High"],
         coords: [[28.735, 77.105], [28.735, 77.125], [28.715, 77.125], [28.715, 77.105]]
     }
 ];
+
+let currentDay = 0; // 0 = Today, 1 = +1 day, etc.
+let wardLayers = []; // stores each polygon so we can update it later
 
 // Color mapping for each risk level
 function getColor(risk) {
@@ -59,16 +62,29 @@ function getColor(risk) {
 }
 
 // Draw each ward as a colored polygon
+// Draw each ward as a colored polygon
 wards.forEach(ward => {
+    const risk = ward.forecast[currentDay];
     const polygon = L.polygon(ward.coords, {
         color: 'white',
         weight: 1,
-        fillColor: getColor(ward.risk),
+        fillColor: getColor(risk),
         fillOpacity: 0.6
     }).addTo(map);
 
-    polygon.bindPopup(`<b>${ward.name}</b><br>Risk Level: ${ward.risk}`);
+    polygon.bindPopup(`<b>${ward.name}</b><br>Risk Level: ${risk}`);
+    wardLayers.push(polygon);
 });
+
+// Updates all ward colors/popups when the selected day changes
+function updateWards(dayIndex) {
+    currentDay = dayIndex;
+    wards.forEach((ward, i) => {
+        const risk = ward.forecast[dayIndex];
+        wardLayers[i].setStyle({ fillColor: getColor(risk) });
+        wardLayers[i].setPopupContent(`<b>${ward.name}</b><br>Risk Level: ${risk}`);
+    });
+}
 
 // Add a color legend to the map
 const legend = L.control({ position: 'bottomright' });
@@ -94,6 +110,30 @@ legend.onAdd = function () {
 };
 
 legend.addTo(map);
+// Add day selector control
+const dayControl = L.control({ position: 'topright' });
+
+dayControl.onAdd = function () {
+    const div = L.DomUtil.create('div', 'day-selector');
+    div.style.background = 'white';
+    div.style.padding = '8px';
+    div.style.borderRadius = '8px';
+    div.style.boxShadow = '0 0 5px rgba(0,0,0,0.3)';
+    div.style.fontFamily = 'Arial, sans-serif';
+
+    const labels = ['Today', '+1', '+2', '+3', '+4', '+5'];
+    let html = '<b>Forecast Day</b><br>';
+
+    labels.forEach((label, i) => {
+        html += `<button onclick="updateWards(${i})" style="margin:3px; padding:4px 8px; cursor:pointer;">${label}</button>`;
+    });
+
+    div.innerHTML = html;
+    L.DomEvent.disableClickPropagation(div);
+    return div;
+};
+
+dayControl.addTo(map);
     </script>
 
 </body>
