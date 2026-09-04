@@ -202,6 +202,38 @@ class Settings(BaseSettings):
             if label.strip()
         ]
 
+    # ---- Forecast trajectory (Phase 7) ----------------------------------
+    FORECAST_MAX_DAYS: int = 5
+    # Mean category-level change between the earlier and later halves of the
+    # trajectory needed before a trend is called. Prototype threshold.
+    FORECAST_TREND_THRESHOLD: float = 0.5
+
+    # ---- Hyperlocal zones (Phase 8) -------------------------------------
+    # Relative to backend/ unless absolute. SYNTHETIC DEMO DATA.
+    ZONES_GEOJSON_PATH: str = "data/demo_zones.geojson"
+
+    # ---- Heat action simulator (Phase 9) --------------------------------
+    # PROTOTYPE ASSUMPTIONS, NOT VALIDATED EFFECTIVENESS. Each value is the
+    # maximum modelled effect at 100% coverage. No intervention evaluation
+    # data exists in this repository; these are plausible starting points
+    # held in one place so they can be replaced with real effect sizes.
+    INTERVENTION_COOLING_CENTER_EFFECT: float = 0.25
+    INTERVENTION_WATER_DISTRIBUTION_EFFECT: float = 0.12
+    INTERVENTION_WORK_HOUR_SHIFT_EFFECT: float = 0.20
+    INTERVENTION_PUBLIC_ALERT_EFFECT: float = 0.05
+    INTERVENTION_SHADE_REST_AREA_EFFECT: float = 0.10
+
+    @property
+    def intervention_effects(self) -> dict[str, float]:
+        """Maximum modelled effect per intervention type, at full coverage."""
+        return {
+            "COOLING_CENTER": self.INTERVENTION_COOLING_CENTER_EFFECT,
+            "WATER_DISTRIBUTION": self.INTERVENTION_WATER_DISTRIBUTION_EFFECT,
+            "WORK_HOUR_SHIFT": self.INTERVENTION_WORK_HOUR_SHIFT_EFFECT,
+            "PUBLIC_ALERT": self.INTERVENTION_PUBLIC_ALERT_EFFECT,
+            "SHADE_REST_AREA": self.INTERVENTION_SHADE_REST_AREA_EFFECT,
+        }
+
     # ---- Trained model integration --------------------------------------
     # Paths are relative to backend/ unless absolute.
     # heat_pipeline.py writes heat_model.joblib into its own directory.

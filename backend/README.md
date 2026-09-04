@@ -16,7 +16,10 @@ Smart India Hackathon 2026
 | 4 | Human vulnerability engine | ✅ Complete |
 | 5 | Health risk engine | ✅ Complete |
 | 6 | Explainable AI (SHAP) | ✅ Complete |
-| 7–15 | Forecast, zones, simulator, optimizer, alerts, tests, docs | ⬜ Not started |
+| 7 | Risk trajectory & forecast | ✅ Complete |
+| 8 | Hyperlocal GIS risk zones | ✅ Complete |
+| 9 | Heat Action Simulator | ✅ Complete |
+| 10–15 | Action optimizer, alerts, mortality interface, docs | ⬜ Not started |
 
 ---
 
@@ -720,6 +723,142 @@ this caveat in its `caveat` field.
 
 ---
 
+## Phases 7–9 — Forecast, Map, Simulate
+
+### The decision flow
+
+```
+PREDICT    ml_service            84 features  -> heat hazard category (t+3)
+EXPLAIN    explainability_service SHAP        -> why that category
+FORECAST   forecast_service      trajectory   -> how it changes over 5 days
+MAP        geospatial_service    GeoJSON      -> which zones, and who is exposed
+SIMULATE   intervention_service  scenarios    -> what changes if we act
+```
+
+Four kinds of number appear in these responses, and they are kept apart on
+purpose:
+
+| Kind | Where it comes from | Example |
+|---|---|---|
+| **Observed** | measured weather | today's Heat Index |
+| **Model prediction** | the trained artifact | the t+3 category, with confidence |
+| **Vulnerability estimate** | Phase 4, uncalibrated weights | a zone's 0–1 score |
+| **Simulated effect** | Phase 9 assumptions | risk change under an intervention |
+
+Conflating these is how a heat dashboard misleads. Every response labels
+which it is giving you.
+
+---
+
+## Phase 7 — Risk Trajectory & Forecast
+
+`GET /api/v1/forecast/risk?latitude=28.6139&longitude=77.2090&days=5`
+
+**The honest constraint.** The trained artifact stores `horizon_days: 3`. It
+was fitted on exactly one target — the heat category three days after the
+feature date. It does not predict day 1, 2, 4 or 5, and this endpoint does
+not pretend otherwise. Every day is labelled with the method that produced
+it:
+
+| `method` | Meaning | Confidence |
+|---|---|---|
+| `OBSERVED` | Category from observed weather | — |
+| `NWP_DERIVED` | Category computed from the provider's numerical weather forecast, using the same Heat Index bands the model was trained against. A forecast, but not an ML one. | — |
+| `ML_MODEL` | The trained model at its supported horizon | model class probability |
+
+At the model's horizon both values exist, and **both are reported** —
+`model_risk_level` plus the NWP-derived value in `method_note`. Where they
+disagree, that disagreement is information.
+
+`trend` is deterministic: mean category level of the later half of the
+trajectory minus the earlier half, against a configurable threshold →
+`WORSENING`, `STABLE`, or `IMPROVING`.
+
+---
+
+## Phase 8 — Hyperlocal Risk Zones
+
+`GET /api/v1/zones/risk`
+
+Returns a GeoJSON `FeatureCollection` ready for any mapping library.
+
+> **The bundled dataset is SYNTHETIC.** `data/demo_zones.geojson` contains
+> arbitrary rectangular cells over Delhi — **not** real administrative, ward
+> or census boundaries — with invented demographics. Replace with a real
+> boundary file and real census, occupational, healthcare-access and
+> NCRB/IMD mortality data before any operational use. Both the collection
+> and every feature carry `data_status: SYNTHETIC_DEMO`.
+
+Each feature separates four things:
+
+1. `heat_hazard` — how hot it is
+2. `vulnerability` — how badly this population copes (**Phase 4, reused**)
+3. `human_risk` — the two combined (**Phase 5, existing weights**)
+4. `priority` — what to act on first
+
+**Hazard is city-level, and the response says so.** Open-Meteo's global model
+resolves to roughly 11 km; every demo zone falls inside one grid cell.
+Fetching weather per zone would return identical numbers while implying a
+spatial resolution that does not exist. What varies between zones is
+**vulnerability** — which is precisely the argument for a heat-health system
+over a weather app. True hyperlocal hazard needs downscaling (land surface
+temperature, urban heat island modelling) that this repository does not
+contain and does not fake.
+
+`priority` uses a prototype matrix combining risk level with vulnerability
+level, so a moderately hot but highly vulnerable zone is not out-ranked by a
+hot but resilient one. It is not a published prioritisation standard.
+
+---
+
+## Phase 9 — Heat Action Simulator
+
+`POST /api/v1/interventions/simulate`
+`GET /api/v1/interventions/types`
+
+> **MODELLED SCENARIO.** Reports an estimated change in HeatSentinal's own
+> risk score under explicit assumptions. It does **not** estimate deaths
+> prevented, mortality reduction, or any medical outcome. Effect sizes are
+> uncalibrated prototype assumptions — this repository contains no
+> intervention evaluation data.
+
+Each intervention acts on one channel:
+
+| Type | Channel | Max effect |
+|---|---|---|
+| `COOLING_CENTER` | VULNERABILITY | 0.25 |
+| `WATER_DISTRIBUTION` | VULNERABILITY | 0.12 |
+| `WORK_HOUR_SHIFT` | EXPOSURE | 0.20 |
+| `SHADE_REST_AREA` | EXPOSURE | 0.10 |
+| `PUBLIC_ALERT` | EXPOSURE | 0.05 |
+
+All five are configurable via environment variables.
+
+`effect = max_effect × coverage`. Interventions on the same channel combine
+**multiplicatively** — `∏(1 − effect)` — so stacking yields diminishing
+returns and can never exceed a total reduction. An additive model would let
+four measures sum past 100%, which is not a defensible assumption.
+
+Baseline and simulated scores both come from the same Phase 5 risk engine,
+so they are directly comparable. The simulator never retrains or touches the
+ML model; a test asserts it does not import `ml_service`.
+
+```json
+{
+  "zone_id": "ZONE_01",
+  "baseline":   { "risk_score": 0.79, "risk_level": "EXTREME" },
+  "simulation": { "risk_score": 0.74, "risk_level": "HIGH" },
+  "estimated_risk_reduction": 0.052,
+  "estimated_risk_reduction_percent": 6.56,
+  "risk_level_changed": true,
+  "channel_reductions": { "vulnerability": 0.191, "exposure": 0.0 },
+  "assumptions": ["Cooling centres: assumed to reduce modelled vulnerability ..."],
+  "disclaimer": "MODELLED SCENARIO. ... does NOT estimate deaths prevented ..."
+}
+```
+
+---
+
 ## Testing
 
 ```powershell
@@ -743,6 +882,10 @@ pytest
 | `HEAT_INDEX_CATEGORIES` | `LOW,MODERATE,HIGH,VERY_HIGH,EXTREME` | Phase 3 |
 | `UTCI_WIND_MIN_MS` / `UTCI_WIND_MAX_MS` | `0.5` / `17.0` | Phase 3 |
 | `UTCI_TEMP_MIN_C` / `UTCI_TEMP_MAX_C` | `-50.0` / `50.0` | Phase 3 |
+| `FORECAST_MAX_DAYS` | `5` | Phase 7 |
+| `FORECAST_TREND_THRESHOLD` | `0.5` | Phase 7 |
+| `ZONES_GEOJSON_PATH` | `data/demo_zones.geojson` | Phase 8 |
+| `INTERVENTION_*_EFFECT` | 0.25 / 0.12 / 0.20 / 0.05 / 0.10 | Phase 9 |
 | `MODEL_PATH` | `ml/models` | Phase 13 |
 | `DATABASE_URL` | *(empty)* | Later |
 

@@ -438,14 +438,18 @@ async def get_forecast(
 
 
 async def get_hourly_history(
-    latitude: float, longitude: float, past_days: int
+    latitude: float, longitude: float, past_days: int, forecast_days: int = 1
 ) -> dict[str, Any]:
-    """Fetch recent hourly observations for one coordinate pair.
+    """Fetch hourly observations, optionally with forecast days appended.
 
     Returns the raw hourly series rather than a HeatSentinal schema, because
-    the only consumer is the ML feature builder, which needs the same shape
+    the main consumer is the ML feature builder, which needs the same shape
     the training pipeline saw. Provider isolation is preserved: this is
     still the only module issuing the request.
+
+    `forecast_days` > 1 extends the series into the provider's numerical
+    weather forecast. Phase 7 uses that to derive future heat categories for
+    horizons the trained model does not cover.
     """
     validate_coordinates(latitude, longitude)
     if past_days < 1 or past_days > 92:
@@ -453,11 +457,16 @@ async def get_hourly_history(
             "past_days must be between 1 and 92.",
             details={"field": "past_days", "received": past_days},
         )
+    if forecast_days < 1 or forecast_days > 16:
+        raise ValidationError(
+            "forecast_days must be between 1 and 16.",
+            details={"field": "forecast_days", "received": forecast_days},
+        )
 
     params = _base_params(latitude, longitude)
     params["hourly"] = ",".join(_ML_HISTORY_VARIABLES)
     params["past_days"] = past_days
-    params["forecast_days"] = 1
+    params["forecast_days"] = forecast_days
 
     payload = await _call_provider(params)
 
