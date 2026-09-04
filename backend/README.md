@@ -13,7 +13,7 @@ Smart India Hackathon 2026
 | 1 | FastAPI foundation, config, health, CORS, error handling, Swagger | ✅ Complete |
 | 2 | Weather service (Open-Meteo) | ✅ Complete |
 | 3 | Thermal stress engine (Heat Index, WBGT, UTCI) | ✅ Complete |
-| 4 | Human vulnerability engine | ⬜ Not started |
+| 4 | Human vulnerability engine | ✅ Complete |
 | 5 | Health risk engine | ⬜ Not started |
 | 6–15 | XAI, forecast, zones, simulator, optimizer, alerts, ML, tests, docs | ⬜ Not started |
 
@@ -70,6 +70,7 @@ uvicorn app.main:app --reload
 | http://127.0.0.1:8000/api/v1/weather/forecast | 1-5 day forecast |
 | http://127.0.0.1:8000/api/v1/thermal/calculate | Thermal stress (POST) |
 | http://127.0.0.1:8000/api/v1/thermal/current | Weather + thermal stress |
+| http://127.0.0.1:8000/api/v1/vulnerability/calculate | Vulnerability score (POST) |
 | http://127.0.0.1:8000/docs | Swagger UI |
 | http://127.0.0.1:8000/redoc | ReDoc |
 | http://127.0.0.1:8000/openapi.json | OpenAPI schema |
@@ -340,8 +341,159 @@ Returns `location`, `observed_at`, `weather`, `thermal`, `provider`. If the
 provider supplies no relative humidity the request fails with 502 rather than
 guessing a value.
 
-**Note:** this endpoint uses `latitude`/`longitude`, while the Phase 2 weather
-endpoints use `lat`/`lon`. See the API consistency note below.
+**Coordinate parameter names differ by endpoint.** This is deliberate and
+documented rather than accidental:
+
+| Endpoint | Parameters |
+|---|---|
+| `/api/v1/weather/current` | `lat`, `lon` |
+| `/api/v1/weather/forecast` | `lat`, `lon` |
+| `/api/v1/thermal/current` | `latitude`, `longitude` |
+
+Frontend clients must use the right form per endpoint; the wrong one returns
+422. Swagger at `/docs` shows the correct names for each.
+
+---
+
+## Human Vulnerability Engine (Phase 4)
+
+> **This is a prototype vulnerability scoring framework and is not a
+> medically validated risk score.**
+
+### Purpose
+
+Estimates how susceptible a *population* — never an individual — is to
+extreme heat, by combining six demographic and infrastructural factors into
+one 0–1 score with per-factor contributions a dashboard can explain.
+
+### Input variables
+
+| Variable | Unit | Range |
+|---|---|---|
+| `elderly_population_pct` | % aged 65+ | 0–100 |
+| `outdoor_worker_pct` | % of workforce outdoors | 0–100 |
+| `population_density` | people/km² | ≥ 0 |
+| `healthcare_accessibility` | index (**protective**) | 0–1 |
+| `historical_heat_exposure` | index | 0–1 |
+| `historical_heat_mortality` | index | 0–1 |
+
+### Normalisation
+
+| Factor | Method |
+|---|---|
+| Elderly population | percentage ÷ 100 |
+| Outdoor workers | percentage ÷ 100 |
+| Population density | log₁₀ between configurable floor and ceiling |
+| Healthcare accessibility | **`1 − access`** (inverted) |
+| Historical heat exposure | already 0–1, clamped |
+| Historical heat mortality | already 0–1, clamped |
+
+**Direction convention:** every normalised factor points the same way —
+1.0 means *more* vulnerable. Healthcare accessibility is protective, so it
+is inverted. An input of 0.62 appears as 0.38 in `factors`.
+
+**Why log for density.** District density spans roughly four orders of
+magnitude. Under linear normalisation against a 20,000/km² ceiling, a
+district at 2,000/km² scores 0.10 and one at 200/km² scores 0.01 — almost
+every district collapses into the bottom of the range and the factor stops
+discriminating. Log scaling spreads them out and encodes the assumption
+that the marginal effect of extra density diminishes at the top.
+
+**Explicitly uncalibrated:** the floor (10/km²) and ceiling (20,000/km²) are
+prototype anchors, *not* surveyed extremes. Set them from real census data
+before using this for anything real. `POPULATION_DENSITY_NORMALISATION` can
+be switched to `linear`.
+
+### Weights and scoring
+
+`score = Σ (weight × normalised factor)`
+
+| Factor | Weight |
+|---|---|
+| Elderly population | 0.20 |
+| Outdoor workers | 0.20 |
+| Population density | 0.15 |
+| Healthcare accessibility | 0.15 |
+| Historical heat exposure | 0.15 |
+| Historical heat mortality | 0.15 |
+
+Weights live only in `app/core/config.py`, are environment-overridable, and
+**must sum to 1.0** — a set that does not raises a 500 rather than silently
+rescaling every score.
+
+### Thresholds
+
+| Score | Level |
+|---|---|
+| 0.00–0.24 | LOW |
+| 0.25–0.49 | MODERATE |
+| 0.50–0.74 | HIGH |
+| 0.75–1.00 | EXTREME |
+
+Configurable prototype edges, not clinical cut-offs.
+
+### Limitations
+
+- Weights are uncalibrated prototype values, not derived from Indian
+  heat-mortality data.
+- Thresholds are prototype edges, not epidemiological cut-offs.
+- The model is linear and additive — it cannot represent interactions such
+  as elderly residents who are *also* outdoor workers.
+- Density floor/ceiling are prototype anchors, not surveyed extremes.
+- Healthcare accessibility, historical exposure and historical mortality
+  arrive as pre-computed 0–1 indices; this engine does not define how they
+  are derived. Phase 12 will supply them from NCRB, IMD and census sources.
+- Vulnerability describes a population, never an individual.
+
+**No Indian demographic or mortality data is fabricated anywhere in this
+engine.** It computes only from values supplied in the request.
+
+### `POST /api/v1/vulnerability/calculate`
+
+```powershell
+$body = @{
+    elderly_population_pct    = 12.5
+    outdoor_worker_pct        = 28.0
+    population_density        = 8500
+    healthcare_accessibility  = 0.62
+    historical_heat_exposure  = 0.70
+    historical_heat_mortality = 0.35
+} | ConvertTo-Json
+
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/api/v1/vulnerability/calculate" `
+    -Method Post -ContentType "application/json" -Body $body | ConvertTo-Json -Depth 6
+```
+
+```json
+{
+  "vulnerability_score": 0.4286,
+  "vulnerability_level": "MODERATE",
+  "factors": {
+    "elderly_population": 0.125,
+    "outdoor_workers": 0.28,
+    "population_density": 0.8874,
+    "healthcare_accessibility": 0.38,
+    "historical_heat_exposure": 0.7,
+    "historical_heat_mortality": 0.35
+  },
+  "contributions": {
+    "elderly_population": 0.025,
+    "outdoor_workers": 0.056,
+    "population_density": 0.133114,
+    "healthcare_accessibility": 0.057,
+    "historical_heat_exposure": 0.105,
+    "historical_heat_mortality": 0.0525
+  },
+  "weights": { "elderly_population": 0.2, "...": "..." },
+  "normalisation": { "healthcare_accessibility": "1 - accessibility (INVERTED: protective factor)" },
+  "thresholds": { "LOW": 0.25, "MODERATE": 0.5, "HIGH": 0.75, "EXTREME": 1.0 },
+  "limitations": ["..."],
+  "disclaimer": "PROTOTYPE VULNERABILITY FRAMEWORK - NOT A MEDICALLY VALIDATED RISK SCORE..."
+}
+```
+
+`contributions` sums to `vulnerability_score`, so the frontend can show
+exactly why an area scored as it did.
 
 ---
 

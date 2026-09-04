@@ -83,6 +83,63 @@ class Settings(BaseSettings):
             if label.strip()
         ]
 
+    # ---- Vulnerability engine (Phase 4) ---------------------------------
+    # PROTOTYPE WEIGHTS. Not medically or scientifically validated. They are
+    # plausible starting values, kept here (and only here) so they can be
+    # recalibrated against real Indian data without touching any code.
+    # Must sum to 1.0.
+    VULNERABILITY_WEIGHT_ELDERLY: float = 0.20
+    VULNERABILITY_WEIGHT_OUTDOOR_WORKERS: float = 0.20
+    VULNERABILITY_WEIGHT_POPULATION_DENSITY: float = 0.15
+    VULNERABILITY_WEIGHT_HEALTHCARE_ACCESS: float = 0.15
+    VULNERABILITY_WEIGHT_HISTORICAL_EXPOSURE: float = 0.15
+    VULNERABILITY_WEIGHT_HISTORICAL_MORTALITY: float = 0.15
+
+    # Population density normalisation. "log" or "linear".
+    # Log is the default because district density spans four orders of
+    # magnitude; linear normalisation pins almost every district near zero.
+    POPULATION_DENSITY_NORMALISATION: str = "log"
+    POPULATION_DENSITY_FLOOR: float = 10.0
+    POPULATION_DENSITY_CEILING: float = 20000.0
+
+    # PROTOTYPE category edges, configurable.
+    VULNERABILITY_BOUNDS: str = "0.25,0.50,0.75"
+    VULNERABILITY_CATEGORIES: str = "LOW,MODERATE,HIGH,EXTREME"
+
+    @property
+    def vulnerability_weights(self) -> dict[str, float]:
+        """Factor weights as a dict. Keys match the response `factors` keys."""
+        return {
+            "elderly_population": self.VULNERABILITY_WEIGHT_ELDERLY,
+            "outdoor_workers": self.VULNERABILITY_WEIGHT_OUTDOOR_WORKERS,
+            "population_density": self.VULNERABILITY_WEIGHT_POPULATION_DENSITY,
+            "healthcare_accessibility": (
+                self.VULNERABILITY_WEIGHT_HEALTHCARE_ACCESS
+            ),
+            "historical_heat_exposure": (
+                self.VULNERABILITY_WEIGHT_HISTORICAL_EXPOSURE
+            ),
+            "historical_heat_mortality": (
+                self.VULNERABILITY_WEIGHT_HISTORICAL_MORTALITY
+            ),
+        }
+
+    @property
+    def vulnerability_bounds_list(self) -> list[float]:
+        return [
+            float(edge.strip())
+            for edge in self.VULNERABILITY_BOUNDS.split(",")
+            if edge.strip()
+        ]
+
+    @property
+    def vulnerability_categories_list(self) -> list[str]:
+        return [
+            label.strip()
+            for label in self.VULNERABILITY_CATEGORIES.split(",")
+            if label.strip()
+        ]
+
     # ---- Machine learning (used from Phase 13 onwards) ------------------
     MODEL_PATH: str = "ml/models"
 
