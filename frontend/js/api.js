@@ -1,91 +1,127 @@
-/**
- * Heat Sentinel - API Service Layer
- * Centralized API client for communicating with the FastAPI backend.
+/* HeatSentinal API client.
+ *
+ * One method per real backend endpoint. Every path and query parameter here
+ * was read off the running app's /openapi.json -- nothing is invented.
+ *
+ * Note the deliberate parameter inconsistency in the backend: /weather/*
+ * takes lat/lon, while /thermal, /forecast and /zones take latitude/longitude.
+ * That is documented upstream, so it is honoured rather than "corrected".
  */
+(function () {
+  const CFG = window.HS_CONFIG;
 
-const CONFIG = {
-    API_BASE_URL: (window.HEAT_SENTINEL_CONFIG && window.HEAT_SENTINEL_CONFIG.API_BASE_URL) 
-        ? window.HEAT_SENTINEL_CONFIG.API_BASE_URL 
-        : 'http://127.0.0.1:8000/api/v1',
-    DEFAULT_COORDS: {
-        lat: 28.6139,
-        lon: 77.2090,
-        city: 'Delhi'
-    },
-    TIMEOUT_MS: 15000
-};
-
-class ApiService {
-    constructor() {
-        this.baseUrl = CONFIG.API_BASE_URL;
+  class ApiError extends Error {
+    constructor(message, status, details) {
+      super(message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.details = details || null;
     }
+  }
 
-    async _fetchJson(endpoint, options = {}) {
-        const url = `${this.baseUrl}${endpoint}`;
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT_MS);
+  function qs(params) {
+    const p = new URLSearchParams();
+    Object.entries(params || {}).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') p.append(k, v);
+    });
+    const s = p.toString();
+    return s ? `?${s}` : '';
+  }
 
-        try {
-            const response = await fetch(url, {
-                ...options,
-                signal: controller.signal,
-                headers: {
-                    'Accept': 'application/json',
-                    ...(options.headers || {})
-                }
-            });
-            clearTimeout(timeoutId);
+  async function request(path, { method = 'GET', body, signal } = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort('timeout'), CFG.TIMEOUT_MS);
+    // Caller-supplied signal composes with the timeout so a page change
+    // cancels in-flight requests instead of letting them land on a dead view.
+    if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true });
 
-            if (!response.ok) {
-                let errorData = {};
-                try {
-                    errorData = await response.json();
-                } catch (e) {
-                    // Ignore body parsing failure
-                }
-                const errorMsg = errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`;
-                const err = new Error(errorMsg);
-                err.status = response.status;
-                err.details = errorData;
-                throw err;
-            }
+    try {
+      const res = await fetch(CFG.API_BASE_URL + path, {
+        method,
+        signal: controller.signal,
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined
+      });
 
-            return await response.json();
-        } catch (error) {
-            clearTimeout(timeoutId);
-            if (error.name === 'AbortError') {
-                const timeoutErr = new Error(`Request to ${endpoint} timed out after ${CONFIG.TIMEOUT_MS / 1000}s`);
-                timeoutErr.status = 504;
-                throw timeoutErr;
-            }
-            throw error;
-        }
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+
+      if (!res.ok) {
+        // The backend wraps every failure in one envelope:
+        // { error: { type, message, details } }
+        const env = data && data.error;
+        throw new ApiError(
+          (env && env.message) || `Request failed (${res.status})`,
+          res.status,
+          (env && env.details) || null
+        );
+      }
+      return data;
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new ApiError('The request timed out.', 0, { path });
+      }
+      if (err instanceof ApiError) throw err;
+      throw new ApiError('Cannot reach the backend.', 0, { path });
+    } finally {
+      clearTimeout(timer);
     }
+  }
 
-    async getHealthDetails() {
-        return await this._fetchJson('/health/details');
-    }
+  const api = {
+    ApiError,
 
-    async getModelStatus() {
-        return await this._fetchJson('/risk/model');
-    }
+    // --- System -----------------------------------------------------------
+    health:        (o) => request('/health', o),
+    healthDetails: (o) => request('/health/details', o),
+    modelStatus:   (o) => request('/risk/model', o),
 
-    async getCurrentWeather(lat = CONFIG.DEFAULT_COORDS.lat, lon = CONFIG.DEFAULT_COORDS.lon) {
-        return await this._fetchJson(`/weather/current?lat=${lat}&lon=${lon}`);
-    }
+    // --- Weather (lat/lon) ------------------------------------------------
+    weatherCurrent:  (lat, lon, o) => request(`/weather/current${qs({ lat, lon })}`, o),
+    weatherForecast: (lat, lon, days, o) =>
+      request(`/weather/forecast${qs({ lat, lon, days })}`, o),
 
-    async getWeatherForecast(lat = CONFIG.DEFAULT_COORDS.lat, lon = CONFIG.DEFAULT_COORDS.lon, days = 5) {
-        return await this._fetchJson(`/weather/forecast?lat=${lat}&lon=${lon}&days=${days}`);
-    }
+    // --- Thermal (latitude/longitude) -------------------------------------
+    thermalCurrent: (latitude, longitude, o) =>
+      request(`/thermal/current${qs({ latitude, longitude })}`, o),
+    thermalCalculate: (payload, o) =>
+      request('/thermal/calculate', { ...o, method: 'POST', body: payload }),
 
-    async getCurrentThermal(lat = CONFIG.DEFAULT_COORDS.lat, lon = CONFIG.DEFAULT_COORDS.lon) {
-        return await this._fetchJson(`/thermal/current?latitude=${lat}&longitude=${lon}`);
-    }
+    // --- Vulnerability ----------------------------------------------------
+    vulnerability: (payload, o) =>
+      request('/vulnerability/calculate', { ...o, method: 'POST', body: payload }),
 
-    async getRiskForecast(lat = CONFIG.DEFAULT_COORDS.lat, lon = CONFIG.DEFAULT_COORDS.lon) {
-        return await this._fetchJson(`/risk/forecast?latitude=${lat}&longitude=${lon}`);
-    }
-}
+    // --- Risk -------------------------------------------------------------
+    riskPredict: (payload, o) =>
+      request('/risk/predict', { ...o, method: 'POST', body: payload }),
+    /** explain=true adds real SHAP values. Without it, none are returned. */
+    riskForecast: (latitude, longitude, explain, o) =>
+      request(`/risk/forecast${qs({ latitude, longitude, explain: explain ? 'true' : undefined })}`, o),
 
-window.apiService = new ApiService();
-window.HEAT_SENTINEL_CONFIG = CONFIG;
+    // --- Trajectory -------------------------------------------------------
+    trajectory: (latitude, longitude, days, o) =>
+      request(`/forecast/risk${qs({ latitude, longitude, days })}`, o),
+
+    // --- Geospatial -------------------------------------------------------
+    zones: (latitude, longitude, o) =>
+      request(`/zones/risk${qs({ latitude, longitude })}`, o),
+
+    // --- Interventions ----------------------------------------------------
+    interventionTypes: (o) => request('/interventions/types', o),
+    simulate: (payload, o) =>
+      request('/interventions/simulate', { ...o, method: 'POST', body: payload }),
+    optimize: (payload, o) =>
+      request('/interventions/optimize', { ...o, method: 'POST', body: payload }),
+
+    // --- Alerts -----------------------------------------------------------
+    evaluateAlert: (zone_id, days, o) =>
+      request('/alerts/evaluate', { ...o, method: 'POST', body: { zone_id, days } }),
+
+    // --- Health / mortality ----------------------------------------------
+    healthData:       (o) => request('/health-data', o),
+    healthValidation: (o) => request('/health-data/validation', o)
+  };
+
+  window.HS_API = api;
+})();

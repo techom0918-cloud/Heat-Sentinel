@@ -1,469 +1,169 @@
-/**
- * Heat Sentinel - Main Dashboard Application Controller
- * Manages state, API integration, UI rendering, day forecast controls, and error states.
- */
+/* Shell: navigation, header controls, hash router, backend status.
+ * Pages register themselves on window.HS_PAGES and receive an AbortSignal
+ * so a navigation cancels whatever the previous page had in flight. */
+(function () {
+  const UI = window.HS_UI, API = window.HS_API, CFG = window.HS_CONFIG;
 
-document.addEventListener('DOMContentLoaded', () => {
-    class DashboardApp {
-        constructor() {
-            this.activeDayIndex = 0; // 0 = Today, 1 = +1, 2 = +2, 3 = +3
-            this.isBackendOnline = false;
-            this.isLoading = true;
+  const NAV = [
+    ['dashboard',     'Dashboard',        'M3 10.5 12 3l9 7.5V21H3z'],
+    ['map',           'Hyperlocal GIS',    'm9 4 6 2 6-2v14l-6 2-6-2-6 2V6z'],
+    ['risk',          'Heat Risk',        'M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'],
+    ['thermal',       'Thermal Stress',   'M14 14.8V4a2 2 0 0 0-4 0v10.8a4 4 0 1 0 4 0z'],
+    ['vulnerability', 'Vulnerability',    'M19 14c1.5-1.5 3-3.3 3-5.5A5.5 5.5 0 0 0 12 5a5.5 5.5 0 0 0-10 3.5C2 10.7 3.5 12.5 5 14l7 7z'],
+    ['ml',            'ML Prediction',    'M12 2v4m0 12v4M2 12h4m12 0h4M6 6l3 3m6 6 3 3m0-12-3 3m-6 6-3 3'],
+    ['explain',       'Explainable AI',   'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01'],
+    ['forecast',      'Forecast & Trends','m3 17 6-6 4 4 8-8M17 7h4v4'],
+    ['simulator',     'Action Simulator', 'M12 2 2 7l10 5 10-5zM2 17l10 5 10-5M2 12l10 5 10-5'],
+    ['optimizer',     'Action Optimizer', 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zm0-6a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'],
+    ['alerts',        'Alerts & Warnings','M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a2 2 0 0 0 3.4 0'],
+    ['health',        'Health & Mortality','M19 14c1.5-1.5 3-3.3 3-5.5A5.5 5.5 0 0 0 12 5a5.5 5.5 0 0 0-10 3.5C2 10.7 3.5 12.5 5 14l7 7z'],
+    ['data',          'Data & Sources',   'M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6'],
+    ['system',        'System Status',    'M22 12h-4l-3 9L9 3l-3 9H2']
+  ];
 
-            // Cached API responses
-            this.state = {
-                health: null,
-                modelStatus: null,
-                weatherCurrent: null,
-                weatherForecast: null,
-                thermalCurrent: null,
-                riskForecast: null
-            };
+  const FLOW = ['Predict','Explain','Forecast','Map','Simulate','Optimize','Alert','Validate'];
 
-            this.init();
-        }
+  const state = {
+    lat: CFG.DEFAULT_COORDS.lat,
+    lon: CFG.DEFAULT_COORDS.lon,
+    days: 5,
+    controller: null
+  };
 
-        async init() {
-            // Initialize Leaflet Map
-            if (window.mapManager) {
-                window.mapManager.initMap('map');
-            }
+  const icon = (d) =>
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
 
-            // Setup UI Event Listeners
-            this._setupEventListeners();
+  function shell() {
+    document.body.innerHTML = `
+      <div class="shell">
+        <aside class="rail" id="rail">
+          <div class="rail-brand">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="4"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2m0-14-2 2M7 17l-2 2"/></svg>
+            <b>HeatSentinal</b>
+          </div>
+          <nav class="rail-nav" id="nav">${NAV.map(([id, label, d]) =>
+            `<a href="#/${id}" data-page="${id}">${icon(d)}<span>${label}</span></a>`).join('')}</nav>
+          <div class="rail-foot"><b>SIH 2026</b><span>PS ID 26083 · MoES / NCMRWF</span></div>
+        </aside>
 
-            // Initial Data Load
-            await this.loadAllData();
-        }
+        <div style="min-width:0">
+          <header class="topbar">
+            <button class="rail-toggle" id="railToggle" aria-label="Open navigation">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            </button>
+            <div class="title"><b>HeatSentinal</b>
+              <span>AI-Powered Human Heat-Health Early Warning System</span></div>
+            <div class="flow">${FLOW.map((f, i) =>
+              `${i ? '<i>›</i>' : ''}<b>${f}</b>`).join('')}</div>
+            <div class="org"><b id="beStatus">Checking backend…</b>
+              <span>Ministry of Earth Sciences · NCMRWF</span></div>
+          </header>
 
-        _setupEventListeners() {
-            // Day selector buttons
-            const dayButtons = document.querySelectorAll('.day-btn');
-            dayButtons.forEach((btn, index) => {
-                btn.addEventListener('click', () => {
-                    this.switchDay(index);
-                });
-            });
+          <div class="controls">
+            <div class="ctl"><label for="loc">Location</label>
+              <select class="field" id="loc">
+                <option value="28.6139,77.2090">Delhi (demo zones)</option>
+                <option value="19.0760,72.8777">Mumbai</option>
+                <option value="23.0225,72.5714">Ahmedabad</option>
+                <option value="26.9124,75.7873">Jaipur</option>
+                <option value="22.5726,88.3639">Kolkata</option>
+              </select></div>
+            <div class="ctl"><label>Forecast horizon</label>
+              <div class="seg" id="horizon">
+                <button data-days="3" aria-pressed="false">3 days</button>
+                <button data-days="5" aria-pressed="true">5 days</button>
+              </div></div>
+            <button class="emergency" id="emergency">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/></svg>
+              Emergency View</button>
+          </div>
 
-            // Retry connection button
-            const retryBtn = document.getElementById('retry-btn');
-            if (retryBtn) {
-                retryBtn.addEventListener('click', () => {
-                    this.loadAllData();
-                });
-            }
+          <main id="view"></main>
+        </div>
+      </div>`;
+  }
 
-            // Mobile drawer toggle button (if exists)
-            const mobileToggleBtn = document.getElementById('mobile-toggle-btn');
-            const sidebar = document.getElementById('sidebar');
-            if (mobileToggleBtn && sidebar) {
-                mobileToggleBtn.addEventListener('click', () => {
-                    sidebar.classList.toggle('open');
-                    setTimeout(() => {
-                        if (window.mapManager) window.mapManager.invalidateSize();
-                    }, 300);
-                });
-            }
-        }
-
-        /**
-         * Fetch all backend endpoints concurrently.
-         */
-        async loadAllData() {
-            this._setLoadingState(true);
-            this._hideErrorBanner();
-
-            try {
-                const api = window.apiService;
-
-                // Execute backend calls with Promise.allSettled
-                const [
-                    healthRes,
-                    modelRes,
-                    weatherCurrRes,
-                    weatherFcRes,
-                    thermalCurrRes,
-                    riskFcRes
-                ] = await Promise.allSettled([
-                    api.getHealthDetails(),
-                    api.getModelStatus(),
-                    api.getCurrentWeather(),
-                    api.getWeatherForecast(28.6139, 77.2090, 5),
-                    api.getCurrentThermal(),
-                    api.getRiskForecast()
-                ]);
-
-                // Evaluate health check status
-                if (healthRes.status === 'fulfilled') {
-                    this.state.health = healthRes.value;
-                    this.isBackendOnline = true;
-                } else {
-                    this.isBackendOnline = false;
-                }
-
-                if (modelRes.status === 'fulfilled') this.state.modelStatus = modelRes.value;
-                if (weatherCurrRes.status === 'fulfilled') this.state.weatherCurrent = weatherCurrRes.value;
-                if (weatherFcRes.status === 'fulfilled') this.state.weatherForecast = weatherFcRes.value;
-                if (thermalCurrRes.status === 'fulfilled') this.state.thermalCurrent = thermalCurrRes.value;
-                if (riskFcRes.status === 'fulfilled') this.state.riskForecast = riskFcRes.value;
-
-                if (!this.isBackendOnline && riskFcRes.status === 'rejected' && thermalCurrRes.status === 'rejected') {
-                    this._showErrorBanner('Backend unavailable - unable to load live heat-risk data.');
-                } else {
-                    this._updateHeaderStatus();
-                }
-
-                // Render UI based on current active day
-                this.renderUI();
-            } catch (err) {
-                console.error('[HeatSentinel App] Error loading data:', err);
-                this.isBackendOnline = false;
-                this._showErrorBanner('Backend connection failed. Displaying local offline GIS transit dataset.');
-                this.renderUI();
-            } finally {
-                this._setLoadingState(false);
-            }
-        }
-
-        /**
-         * Switch active forecast day index (0 = Today, 1 = +1, 2 = +2, 3 = +3)
-         */
-        switchDay(dayIndex) {
-            this.activeDayIndex = dayIndex;
-
-            // Update button UI states
-            const dayButtons = document.querySelectorAll('.day-btn');
-            dayButtons.forEach((btn, idx) => {
-                if (idx === dayIndex) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-            });
-
-            this.renderUI();
-        }
-
-        /**
-         * Update all view panels based on activeDayIndex and backend state.
-         */
-        renderUI() {
-            this._renderWeatherCard();
-            this._renderThermalCard();
-            this._renderMlPredictionCard();
-            this._renderModelStatusBadge();
-            this._updateMapCityMarker();
-        }
-
-        /**
-         * Render Weather Information Card
-         */
-        _renderWeatherCard() {
-            const tempEl = document.getElementById('val-temp');
-            const humidityEl = document.getElementById('val-humidity');
-            const windEl = document.getElementById('val-wind');
-            const solarEl = document.getElementById('val-solar');
-            const weatherDescEl = document.getElementById('weather-desc');
-
-            if (!this.isBackendOnline) {
-                if (tempEl) tempEl.textContent = '-- °C';
-                if (humidityEl) humidityEl.textContent = '-- %';
-                if (windEl) windEl.textContent = '-- m/s';
-                if (solarEl) solarEl.textContent = '-- W/m²';
-                if (weatherDescEl) weatherDescEl.textContent = 'Backend Offline';
-                return;
-            }
-
-            if (this.activeDayIndex === 0 && this.state.weatherCurrent) {
-                // Today: Current weather observation
-                const curr = this.state.weatherCurrent.current;
-                if (tempEl) tempEl.textContent = `${curr.temperature_c !== undefined ? curr.temperature_c.toFixed(1) : '--'} °C`;
-                if (humidityEl) humidityEl.textContent = `${curr.relative_humidity !== undefined ? Math.round(curr.relative_humidity) : '--'} %`;
-                if (windEl) windEl.textContent = `${curr.wind_speed_ms !== undefined ? curr.wind_speed_ms.toFixed(1) : '--'} m/s`;
-                if (solarEl) solarEl.textContent = `${curr.solar_radiation_wm2 !== undefined ? Math.round(curr.solar_radiation_wm2) : '--'} W/m²`;
-                if (weatherDescEl) weatherDescEl.textContent = `Observed at ${new Date(curr.observed_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-            } else if (this.state.weatherForecast && this.state.weatherForecast.forecast) {
-                // Forecast Days (+1, +2, +3)
-                const fcList = this.state.weatherForecast.forecast;
-                const fcItem = fcList[this.activeDayIndex];
-
-                if (fcItem) {
-                    if (tempEl) tempEl.textContent = `${fcItem.temperature_max_c !== undefined ? fcItem.temperature_max_c.toFixed(1) : '--'} °C (Max)`;
-                    if (humidityEl) humidityEl.textContent = `${fcItem.relative_humidity_at_max_temp !== undefined ? Math.round(fcItem.relative_humidity_at_max_temp) : (fcItem.relative_humidity_mean ? Math.round(fcItem.relative_humidity_mean) : '--')} %`;
-                    if (windEl) windEl.textContent = `${fcItem.wind_speed_max_ms !== undefined ? fcItem.wind_speed_max_ms.toFixed(1) : '--'} m/s (Max)`;
-                    if (solarEl) solarEl.textContent = `${fcItem.solar_radiation_max_wm2 !== undefined ? Math.round(fcItem.solar_radiation_max_wm2) : '--'} W/m² (Peak)`;
-                    if (weatherDescEl) weatherDescEl.textContent = `Forecast Date: ${fcItem.date}`;
-                }
-            }
-        }
-
-        /**
-         * Render Thermal Indicators Card (Heat Index, WBGT, UTCI)
-         */
-        _renderThermalCard() {
-            const hiEl = document.getElementById('val-hi');
-            const hiCatEl = document.getElementById('cat-hi');
-            const wbgtEl = document.getElementById('val-wbgt');
-            const utciEl = document.getElementById('val-utci');
-            const utciCatEl = document.getElementById('cat-utci');
-
-            if (!this.isBackendOnline || !this.state.thermalCurrent) {
-                if (hiEl) hiEl.textContent = '-- °C';
-                if (hiCatEl) hiCatEl.textContent = 'OFFLINE';
-                if (wbgtEl) wbgtEl.textContent = '-- °C';
-                if (utciEl) utciEl.textContent = '-- °C';
-                if (utciCatEl) utciCatEl.textContent = 'OFFLINE';
-                return;
-            }
-
-            const thermal = this.state.thermalCurrent.thermal;
-            if (hiEl) hiEl.textContent = `${thermal.heat_index !== null ? thermal.heat_index.toFixed(1) : '--'} °C`;
-            if (hiCatEl) {
-                hiCatEl.textContent = thermal.heat_index_category;
-                hiCatEl.className = `category-badge cat-${thermal.heat_index_category.toLowerCase()}`;
-            }
-
-            if (wbgtEl) wbgtEl.textContent = `${thermal.wbgt !== null ? thermal.wbgt.toFixed(1) : '--'} °C`;
-            if (utciEl) utciEl.textContent = `${thermal.utci !== null ? thermal.utci.toFixed(1) : 'N/A'}`;
-            if (utciCatEl) {
-                utciCatEl.textContent = thermal.utci_category;
-                utciCatEl.className = `category-badge cat-${thermal.utci_category.toLowerCase()}`;
-            }
-        }
-
-        /**
-         * Render ML Prediction Information Card
-         * Handles honest behavior for Today, +1/+2, and +3 Day ML Horizon.
-         */
-        _renderMlPredictionCard() {
-            const mlContainer = document.getElementById('ml-prediction-card');
-            if (!mlContainer) return;
-
-            if (!this.isBackendOnline) {
-                mlContainer.innerHTML = `
-                    <div class="card-header">
-                        <span class="card-icon">ML</span>
-                        <h3>ML Risk Prediction</h3>
-                    </div>
-                    <div class="offline-placeholder" style="padding: 16px; text-align: center; color: #6B7280;">
-                        <p style="margin: 0; font-size: 13px;">Backend offline - ML prediction unavailable.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const riskFc = this.state.riskForecast;
-
-            if (this.activeDayIndex === 3) {
-                // +3 Days: Real ML Prediction Available!
-                if (riskFc) {
-                    const predictedCat = riskFc.predicted_category || 'UNKNOWN';
-                    const confidence = riskFc.confidence !== null && riskFc.confidence !== undefined 
-                        ? `${(riskFc.confidence * 100).toFixed(1)}%` 
-                        : 'N/A';
-                    const currentCat = riskFc.current_category || 'N/A';
-                    const classProbs = riskFc.class_probabilities || {};
-
-                    // Generate probability bar distribution HTML
-                    let probBarsHtml = '';
-                    const riskLevels = ['LOW', 'MODERATE', 'HIGH', 'VERY_HIGH', 'EXTREME'];
-                    riskLevels.forEach(lvl => {
-                        const prob = classProbs[lvl] || 0;
-                        const pct = (prob * 100).toFixed(0);
-                        probBarsHtml += `
-                            <div style="margin-bottom: 6px;">
-                                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px;">
-                                    <span style="font-weight: 600; color: #4B5563;">${lvl}</span>
-                                    <span style="color: #6B7280;">${pct}%</span>
-                                </div>
-                                <div style="height: 6px; background: #E5E7EB; border-radius: 3px; overflow: hidden;">
-                                    <div style="width: ${pct}%; height: 100%; background: ${window.mapManager ? window.mapManager.getColor(lvl) : '#3B82F6'}; transition: width 0.4s ease;"></div>
-                                </div>
-                            </div>
-                        `;
-                    });
-
-                    mlContainer.innerHTML = `
-                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <span class="card-icon">ML</span>
-                                <h3 style="margin: 0;">ML 3-Day Hazard Forecast</h3>
-                            </div>
-                            <span class="category-badge cat-${predictedCat.toLowerCase()}" style="font-size: 13px; padding: 4px 10px;">${predictedCat}</span>
-                        </div>
-                        <div class="card-body" style="font-size: 13px; color: #374151;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; background: #F9FAFB; padding: 10px; border-radius: 8px;">
-                                <div>
-                                    <div style="font-size: 11px; color: #6B7280;">Forecast Lead</div>
-                                    <div style="font-weight: 700; color: #111827;">+3 Days Horizon</div>
-                                </div>
-                                <div>
-                                    <div style="font-size: 11px; color: #6B7280;">Model Confidence</div>
-                                    <div style="font-weight: 700; color: #059669;">${confidence}</div>
-                                </div>
-                                <div>
-                                    <div style="font-size: 11px; color: #6B7280;">Based On</div>
-                                    <div style="font-weight: 600;">${riskFc.based_on || 'Today'}</div>
-                                </div>
-                                <div>
-                                    <div style="font-size: 11px; color: #6B7280;">Issued For</div>
-                                    <div style="font-weight: 600;">${riskFc.issued_for || 'T+3'}</div>
-                                </div>
-                            </div>
-
-                            <div style="margin-bottom: 12px;">
-                                <div style="font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 6px;">Class Probability Distribution</div>
-                                ${probBarsHtml}
-                            </div>
-
-                            <div style="font-size: 11px; color: #6B7280; border-top: 1px solid #F3F4F6; padding-top: 8px; margin-top: 8px;">
-                                <strong>Persistence Baseline (Today):</strong> ${currentCat} (${riskFc.current_heat_index_max} °C peak)
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    mlContainer.innerHTML = `
-                        <div class="card-header"><span class="card-icon">ML</span><h3>ML Risk Prediction</h3></div>
-                        <p style="padding: 12px; font-size: 13px; color: #EF4444;">ML forecast artifact unavailable (503). Run <code>ml/heat_pipeline.py</code> to train.</p>
-                    `;
-                }
-            } else if (this.activeDayIndex === 0) {
-                // Today (Day 0)
-                const currentCat = riskFc ? riskFc.current_category : (this.state.thermalCurrent ? this.state.thermalCurrent.thermal.heat_index_category : 'UNKNOWN');
-                mlContainer.innerHTML = `
-                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="card-icon">STAT</span>
-                            <h3 style="margin: 0;">Today's Heat Risk Status</h3>
-                        </div>
-                        <span class="category-badge cat-${currentCat.toLowerCase()}" style="font-size: 13px; padding: 4px 10px;">${currentCat}</span>
-                    </div>
-                    <div class="card-body" style="font-size: 13px; color: #374151; padding-top: 6px;">
-                        <p style="margin: 0 0 10px 0; line-height: 1.5; color: #4B5563;">
-                            Currently observing <strong>${currentCat}</strong> thermal stress based on real-time weather stations in Delhi.
-                        </p>
-                        <div style="background: #EFF6FF; border-left: 3px solid #3B82F6; padding: 8px 12px; border-radius: 4px; font-size: 12px; color: #1E40AF;">
-                            Notice: Select the <strong>+3</strong> button to inspect the AI ML 3-day lead hazard forecast.
-                        </div>
-                    </div>
-                `;
-            } else {
-                // +1 or +2 Days
-                mlContainer.innerHTML = `
-                    <div class="card-header">
-                        <span class="card-icon">FCST</span>
-                        <h3>Weather Forecast (+${this.activeDayIndex} Day)</h3>
-                    </div>
-                    <div class="card-body" style="font-size: 13px; color: #374151;">
-                        <p style="margin: 0 0 10px 0; color: #4B5563;">
-                            Showing weather & thermal condition forecasts for <strong>+${this.activeDayIndex} day</strong>.
-                        </p>
-                        <div style="background: #FFFBEB; border-left: 3px solid #F59E0B; padding: 10px 12px; border-radius: 4px; font-size: 12px; color: #92400E;">
-                            <strong>ML Horizon Note:</strong> The ML model is specifically trained for a <strong>+3 day lead forecast</strong>. Select the <strong>+3</strong> tab to view the ML hazard model prediction.
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        /**
-         * Render Model Status Badge in Header
-         */
-        _renderModelStatusBadge() {
-            const statusBadge = document.getElementById('model-status-badge');
-            if (!statusBadge) return;
-
-            if (!this.isBackendOnline) {
-                statusBadge.innerHTML = `<span class="status-dot offline"></span> API Offline`;
-                statusBadge.className = 'badge badge-offline';
-                return;
-            }
-
-            const modelStat = this.state.modelStatus;
-            if (modelStat && modelStat.available) {
-                const info = modelStat.model_info || {};
-                const csi = info.test_metrics && info.test_metrics.CSI !== undefined 
-                    ? ` (CSI: ${info.test_metrics.CSI})` 
-                    : '';
-                statusBadge.innerHTML = `<span class="status-dot online"></span> ${info.type || 'ML Model'} Ready${csi}`;
-                statusBadge.className = 'badge badge-online';
-            } else {
-                statusBadge.innerHTML = `<span class="status-dot warning"></span> ML Model Unloaded`;
-                statusBadge.className = 'badge badge-warning';
-            }
-        }
-
-        /**
-         * Update City Marker on GIS Map
-         */
-        _updateMapCityMarker() {
-            if (!window.mapManager) return;
-
-            let cat = 'LOW';
-            let hiPeak = null;
-            let sourceLabel = 'Observed Station';
-
-            if (this.activeDayIndex === 3 && this.state.riskForecast) {
-                cat = this.state.riskForecast.predicted_category;
-                sourceLabel = 'ML Hazard Forecast (+3d)';
-            } else if (this.activeDayIndex === 0 && this.state.thermalCurrent) {
-                cat = this.state.thermalCurrent.thermal.heat_index_category;
-                hiPeak = this.state.thermalCurrent.thermal.heat_index;
-                sourceLabel = 'Observed Today';
-            } else if (this.state.weatherForecast && this.state.weatherForecast.forecast) {
-                const fcItem = this.state.weatherForecast.forecast[this.activeDayIndex];
-                if (fcItem && fcItem.temperature_max_c) {
-                    const temp = fcItem.temperature_max_c;
-                    if (temp >= 41) cat = 'VERY_HIGH';
-                    else if (temp >= 32) cat = 'HIGH';
-                    else if (temp >= 27) cat = 'MODERATE';
-                    else cat = 'LOW';
-                    hiPeak = temp;
-                    sourceLabel = `Weather Forecast (+${this.activeDayIndex}d)`;
-                }
-            }
-
-            window.mapManager.updateCityMarker('Delhi Central Station', cat, hiPeak ? hiPeak.toFixed(1) : null, sourceLabel);
-        }
-
-        _setLoadingState(loading) {
-            this.isLoading = loading;
-            const loader = document.getElementById('loading-overlay');
-            if (loader) {
-                loader.style.display = loading ? 'flex' : 'none';
-            }
-        }
-
-        _updateHeaderStatus() {
-            const connBadge = document.getElementById('connection-status');
-            if (connBadge) {
-                if (this.isBackendOnline) {
-                    connBadge.innerHTML = `<span class="status-dot online"></span> Backend Connected`;
-                    connBadge.className = 'badge badge-online';
-                } else {
-                    connBadge.innerHTML = `<span class="status-dot offline"></span> Backend Disconnected`;
-                    connBadge.className = 'badge badge-offline';
-                }
-            }
-        }
-
-        _showErrorBanner(message) {
-            const banner = document.getElementById('error-banner');
-            const msgEl = document.getElementById('error-message');
-            if (banner && msgEl) {
-                msgEl.textContent = message;
-                banner.style.display = 'flex';
-            }
-        }
-
-        _hideErrorBanner() {
-            const banner = document.getElementById('error-banner');
-            if (banner) {
-                banner.style.display = 'none';
-            }
-        }
+  async function backendStatus() {
+    const el = document.getElementById('beStatus');
+    try {
+      const [h, m] = await Promise.allSettled([API.healthDetails(), API.modelStatus()]);
+      const up = h.status === 'fulfilled';
+      const model = m.status === 'fulfilled' && m.value && m.value.available;
+      el.textContent = up
+        ? `Backend online · ML model ${model ? 'loaded' : 'not loaded'}`
+        : 'Backend unreachable';
+      el.style.color = up ? (model ? '#10B981' : '#F59E0B') : '#B91C1C';
+    } catch {
+      el.textContent = 'Backend unreachable';
+      el.style.color = '#B91C1C';
     }
+  }
 
-    // Launch App
-    window.app = new DashboardApp();
-});
+  function setActive(page) {
+    document.querySelectorAll('#nav a').forEach(a =>
+      a.classList.toggle('active', a.dataset.page === page));
+  }
+
+  async function route() {
+    const page = (location.hash.replace(/^#\/?/, '') || 'dashboard').split('?')[0];
+    setActive(page);
+    document.getElementById('rail').classList.remove('open');
+
+    // Cancel anything the previous page still had running.
+    if (state.controller) state.controller.abort();
+    state.controller = new AbortController();
+
+    const view = document.getElementById('view');
+    window.HS_MAP.destroy();
+
+    const mod = window.HS_PAGES[page];
+    if (!mod) {
+      view.innerHTML = `<section class="panel"><div class="panel-head"><div>
+        <h2>${UI.esc(page.replace(/\b\w/g, c => c.toUpperCase()))}</h2>
+        <p>This module is not built yet</p></div></div>
+        <div class="panel-body">${UI.empty('The backend endpoint for this view exists; the interface is still to come.')}</div></section>`;
+      return;
+    }
+    try {
+      await mod.render(view, { ...state, signal: state.controller.signal });
+    } catch (err) {
+      if (state.controller.signal.aborted) return;
+      // A page throwing must not take the shell down with it.
+      view.innerHTML = `<section class="panel"><div class="panel-body">
+        ${UI.failed('this view', err && err.message, 'route')}</div></section>`;
+    }
+  }
+
+  function wire() {
+    document.getElementById('loc').addEventListener('change', (e) => {
+      const [la, lo] = e.target.value.split(',').map(Number);
+      state.lat = la; state.lon = lo;
+      CFG.MAP_CENTER = [la, lo];
+      CFG.DEFAULT_COORDS.label = e.target.selectedOptions[0].text.replace(/\s*\(.*\)$/, '');
+      route();
+    });
+    document.getElementById('horizon').addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-days]');
+      if (!b) return;
+      state.days = Number(b.dataset.days);
+      document.querySelectorAll('#horizon button').forEach(x =>
+        x.setAttribute('aria-pressed', String(x === b)));
+      route();
+    });
+    document.getElementById('emergency').addEventListener('click', () => {
+      location.hash = '#/alerts';
+    });
+    document.getElementById('railToggle').addEventListener('click', () =>
+      document.getElementById('rail').classList.toggle('open'));
+    document.body.addEventListener('click', (e) => {
+      if (e.target.closest('[data-retry]')) route();
+    });
+    window.addEventListener('hashchange', route);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    shell(); wire(); backendStatus(); route();
+  });
+})();
