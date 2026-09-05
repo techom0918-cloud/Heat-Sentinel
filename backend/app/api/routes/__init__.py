@@ -8,12 +8,12 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     alerts,
+    auth,
     forecast,
     geospatial,
     health,
     health_data,
     intervention,
-    personalization,
     risk,
     thermal,
     vulnerability,
@@ -31,6 +31,6 @@ api_router.include_router(geospatial.router)
 api_router.include_router(intervention.router)
 api_router.include_router(alerts.router)
 api_router.include_router(health_data.router)
-api_router.include_router(personalization.router)
+api_router.include_router(auth.router)
 
 __all__ = ["api_router"]
