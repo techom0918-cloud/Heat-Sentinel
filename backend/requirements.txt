@@ -61,3 +61,7 @@ xgboost==3.2.0
 # geopandas==1.0.1
 # shapely==2.0.6
 # rasterio==1.4.3
+
+# --- Phase 16 (accounts: signup/login/forgot-password) ---
+# No new dependencies. auth_service uses sqlite3, hashlib and secrets, all
+# standard library, on top of what Phases 1-6 already installed.
