@@ -64,6 +64,14 @@ class ExternalServiceError(HeatSentinalError):
     error_type = "external_service_error"
 
 
+class AuthenticationError(HeatSentinalError):
+    """Login credentials were wrong, or a session/reset token is invalid,
+    missing, or expired (Phase 16)."""
+
+    status_code = status.HTTP_401_UNAUTHORIZED
+    error_type = "authentication_error"
+
+
 class ResourceNotFoundError(HeatSentinalError):
     """A requested record, zone, or dataset does not exist."""
 
