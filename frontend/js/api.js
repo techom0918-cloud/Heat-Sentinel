@@ -28,7 +28,7 @@
     return s ? `?${s}` : '';
   }
 
-  async function request(path, { method = 'GET', body, signal } = {}) {
+  async function request(path, { method = 'GET', body, signal, headers } = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort('timeout'), CFG.TIMEOUT_MS);
     // Caller-supplied signal composes with the timeout so a page change
@@ -36,10 +36,11 @@
     if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true });
 
     try {
+      const mergedHeaders = { ...(body ? { 'Content-Type': 'application/json' } : {}), ...(headers || {}) };
       const res = await fetch(CFG.API_BASE_URL + path, {
         method,
         signal: controller.signal,
-        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        headers: Object.keys(mergedHeaders).length ? mergedHeaders : undefined,
         body: body ? JSON.stringify(body) : undefined
       });
 
@@ -118,19 +119,22 @@
     evaluateAlert: (zone_id, days, o) =>
       request('/alerts/evaluate', { ...o, method: 'POST', body: { zone_id, days } }),
 
-
-    // --- Personalisation (additive layer; nothing existing changed) -------
-    putProfile:    (body, o) => request('/personal/profile', { ...o, method: 'PUT', body }),
-    getProfile:    (user_id, o) => request(`/personal/profile${qs({ user_id })}`, o),
-    putHealth:     (body, o) => request('/personal/health-profile', { ...o, method: 'PUT', body }),
-    getHealth:     (user_id, o) => request(`/personal/health-profile${qs({ user_id })}`, o),
-    putAssessment: (body, o) => request('/personal/assessment', { ...o, method: 'PUT', body }),
-    getAssessment: (user_id, o) => request(`/personal/assessment${qs({ user_id })}`, o),
-    personalRisk:  (body, o) => request('/personal/risk', { ...o, method: 'POST', body }),
-
     // --- Health / mortality ----------------------------------------------
     healthData:       (o) => request('/health-data', o),
-    healthValidation: (o) => request('/health-data/validation', o)
+    healthValidation: (o) => request('/health-data/validation', o),
+
+    // --- Accounts (Phase 16) -----------------------------------------------
+    securityQuestions: (o) => request('/auth/security-questions', o),
+    signup: (payload, o) => request('/auth/signup', { ...o, method: 'POST', body: payload }),
+    login:  (payload, o) => request('/auth/login',  { ...o, method: 'POST', body: payload }),
+    me:     (token, o) => request('/auth/me', {
+      ...o,
+      headers: { Authorization: `Bearer ${token}` }
+    }),
+    forgotPasswordVerify: (payload, o) =>
+      request('/auth/forgot-password/verify', { ...o, method: 'POST', body: payload }),
+    forgotPasswordReset: (payload, o) =>
+      request('/auth/forgot-password/reset', { ...o, method: 'POST', body: payload })
   };
 
   window.HS_API = api;
