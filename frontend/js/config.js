@@ -4,7 +4,7 @@
  * needs no API key, and anything sensitive stays server-side. */
 window.HS_CONFIG = Object.assign({
   API_BASE_URL: 'http://127.0.0.1:8000/api/v1',
-  TIMEOUT_MS: 12000,
+  TIMEOUT_MS: 30000,
   // Delhi. The shipped demo zones are drawn over this city, so the default
   // view matches the only area the backend has zone polygons for.
   DEFAULT_COORDS: { lat: 28.6139, lon: 77.2090, label: 'Delhi' },

@@ -378,6 +378,82 @@ class Settings(BaseSettings):
     # cut-off -- configurable so it can be recalibrated.
     HEALTH_HIGH_RISK_DEATH_THRESHOLD: int = 50
 
+    # ---- Personalised heat risk profile (personalisation layer) ----------
+    # Storage root for the three separated record types. Relative paths are
+    # resolved against backend/ so the working directory does not matter.
+    PERSONALISATION_STORE_PATH: str = "data/personalisation"
+
+    # Blend between the existing environmental engine and the personal
+    # vulnerability layer. The environmental half is produced by
+    # risk_service.predict_risk and is NOT recomputed here.
+    PERSONAL_ENVIRONMENT_WEIGHT: float = 0.65
+    PERSONAL_VULNERABILITY_WEIGHT: float = 0.35
+
+    # Weights inside the personal vulnerability score. Must sum to 1.0;
+    # validated at call time so a bad override fails loudly.
+    PERSONAL_W_ACCLIMATISATION: float = 0.20
+    PERSONAL_W_EXPOSURE: float = 0.22
+    PERSONAL_W_ACTIVITY: float = 0.15
+    PERSONAL_W_HYDRATION: float = 0.15
+    PERSONAL_W_PROTECTION: float = 0.13
+    PERSONAL_W_AGE: float = 0.10
+    PERSONAL_W_CLIMATE: float = 0.05
+
+    # Self-reported health context is applied as a small capped uplift rather
+    # than folded into the weights, so it can never dominate the score.
+    PERSONAL_HEALTH_UPLIFT_MAX: float = 0.10
+    # BMI is deliberately a minor term. Body size is a weak and contested
+    # predictor of heat strain compared with acclimatisation and exposure.
+    PERSONAL_BMI_UPLIFT_MAX: float = 0.03
+
+    # Population vulnerability handed to the existing risk engine when
+    # scoring an individual. Neutral on purpose: the personal layer
+    # supplies the person-specific half, so a zone score here would
+    # double-count vulnerability.
+    PERSONAL_NEUTRAL_VULNERABILITY: float = 0.5
+
+    # Symptoms that must trigger an urgent-care message instead of a score
+    # change. Never used as a numeric input.
+    PERSONAL_RED_FLAG_SYMPTOMS: str = (
+        "fainting,confusion,difficulty_staying_awake,"
+        "severe_dizziness,severe_weakness,seizure,not_sweating"
+    )
+
+    # Early signs of heat exhaustion. Also never scored, but they earn an
+    # advisory because this is the stage where acting prevents heat stroke.
+    PERSONAL_EARLY_WARNING_SYMPTOMS: str = (
+        "unusual_thirst,headache,dizziness,light_headedness,weakness,"
+        "unusual_tiredness,nausea,vomiting,muscle_cramps,heavy_sweating"
+    )
+
+    @property
+    def personal_early_warning_list(self) -> list[str]:
+        return [
+            s.strip().lower()
+            for s in self.PERSONAL_EARLY_WARNING_SYMPTOMS.split(",")
+            if s.strip()
+        ]
+
+    @property
+    def personal_red_flag_list(self) -> list[str]:
+        return [
+            s.strip().lower()
+            for s in self.PERSONAL_RED_FLAG_SYMPTOMS.split(",")
+            if s.strip()
+        ]
+
+    @property
+    def personal_vulnerability_weights(self) -> dict[str, float]:
+        return {
+            "acclimatisation": self.PERSONAL_W_ACCLIMATISATION,
+            "exposure": self.PERSONAL_W_EXPOSURE,
+            "activity": self.PERSONAL_W_ACTIVITY,
+            "hydration": self.PERSONAL_W_HYDRATION,
+            "protection": self.PERSONAL_W_PROTECTION,
+            "age": self.PERSONAL_W_AGE,
+            "usual_climate": self.PERSONAL_W_CLIMATE,
+        }
+
     # ---- Trained model integration --------------------------------------
     # Paths are relative to backend/ unless absolute.
     # heat_pipeline.py writes heat_model.joblib into its own directory.

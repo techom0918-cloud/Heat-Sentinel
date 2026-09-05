@@ -56,3 +56,10 @@ ml/heat_raw_hourly.csv
 ml/*.joblib
 ml/future_risk_predictions.csv
 ml/train_log.txt
+
+frontend-old/
+
+# Personalisation records are user data, not source.
+backend/data/personalisation/
+
+backend/data/personalisation/
