@@ -223,7 +223,7 @@
           <div class="mini">
             ${cell('Temperature', r.thermal.temperature, ' °C')}
             ${cell('Humidity', r.thermal.relative_humidity, '%', 0)}
-            ${cell('Wind', r.thermal.wind_speed, ' km/h')}
+            ${cell('Wind', r.thermal.wind_speed, ' m/s')}
             ${cell('Heat Index', r.thermal.heat_index, ' °C')}
             ${cell('WBGT', r.thermal.wbgt, ' °C')}
             ${cell('UTCI', r.thermal.utci, ' °C')}

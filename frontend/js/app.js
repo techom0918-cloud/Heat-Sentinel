@@ -16,6 +16,7 @@
     ['simulator',     'Action Simulator', 'M12 2 2 7l10 5 10-5zM2 17l10 5 10-5M2 12l10 5 10-5'],
     ['optimizer',     'Action Optimizer', 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zm0-6a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'],
     ['alerts',        'Alerts & Warnings','M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a2 2 0 0 0 3.4 0'],
+    ['personal',      'My Heat Profile',  'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'],
     ['health',        'Health & Mortality','M19 14c1.5-1.5 3-3.3 3-5.5A5.5 5.5 0 0 0 12 5a5.5 5.5 0 0 0-10 3.5C2 10.7 3.5 12.5 5 14l7 7z'],
     ['data',          'Data & Sources',   'M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6'],
     ['system',        'System Status',    'M22 12h-4l-3 9L9 3l-3 9H2']

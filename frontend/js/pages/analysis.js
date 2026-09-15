@@ -13,7 +13,7 @@
         <div class="form-grid" id="tform">
           ${UI.input('temperature', 'Temperature (°C)', 42)}
           ${UI.input('relative_humidity', 'Relative humidity (%)', 60)}
-          ${UI.input('wind_speed', 'Wind speed (km/h)', 2)}
+          ${UI.input('wind_speed', 'Wind speed (m/s)', 2)}
           ${UI.input('solar_radiation', 'Solar radiation (W/m²)', 500, 'any', 'Accepted but unused in WBGT')}
         </div>
         <button class="btn" id="tcalc">Calculate</button>
@@ -133,7 +133,7 @@
     document.getElementById('rform').innerHTML = `
       ${UI.input('temperature_c', 'Temperature (°C)', t ? t.temperature : 42)}
       ${UI.input('relative_humidity', 'Relative humidity (%)', t ? t.relative_humidity : 65)}
-      ${UI.input('wind_speed', 'Wind speed (km/h)', t ? t.wind_speed : 2.5)}
+      ${UI.input('wind_speed', 'Wind speed (m/s)', t ? t.wind_speed : 2.5)}
       ${UI.input('heat_index', 'Heat Index (°C)', t && t.heat_index !== null ? t.heat_index : 49.2)}
       ${UI.input('wbgt', 'WBGT (°C)', t && t.wbgt !== null ? t.wbgt : 31.5)}
       ${UI.input('utci', 'UTCI (°C)', t && t.utci !== null ? t.utci : 43.1)}

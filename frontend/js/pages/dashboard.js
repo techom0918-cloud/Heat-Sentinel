@@ -198,7 +198,7 @@
       th.innerHTML = `<div class="mini">
           ${cell('Temperature', t.temperature, ' °C')}
           ${cell('Humidity', t.relative_humidity, '%', 0)}
-          ${cell('Wind', t.wind_speed, ' km/h')}
+          ${cell('Wind', t.wind_speed, ' m/s')}
           ${cell('Heat Index', t.heat_index, ' °C')}
           ${cell('WBGT', t.wbgt, ' °C')}
           ${cell('UTCI', t.utci, ' °C')}

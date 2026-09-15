@@ -119,6 +119,12 @@
     evaluateAlert: (zone_id, days, o) =>
       request('/alerts/evaluate', { ...o, method: 'POST', body: { zone_id, days } }),
 
+    // --- Personalisation (additive layer; nothing existing changed) -------
+    putProfile:    (body, o) => request('/personal/profile', { ...o, method: 'PUT', body }),
+    putHealth:     (body, o) => request('/personal/health-profile', { ...o, method: 'PUT', body }),
+    putAssessment: (body, o) => request('/personal/assessment', { ...o, method: 'PUT', body }),
+    personalRisk:  (body, o) => request('/personal/risk', { ...o, method: 'POST', body }),
+
     // --- Health / mortality ----------------------------------------------
     healthData:       (o) => request('/health-data', o),
     healthValidation: (o) => request('/health-data/validation', o),
