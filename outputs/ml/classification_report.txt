@@ -1,0 +1,129 @@
+SELECTED MODEL: LightGBM (chosen by validation macro F1)
+Train=[2022] Validation=[2023] Test=[2024, 2025]
+LIMITATION: no training samples for ['EXTREME']
+
+######################################################################
+XGBoost -- VALIDATION
+######################################################################
+              precision    recall  f1-score   support
+
+         LOW     1.0000    1.0000    1.0000    587419
+    MODERATE     0.9971    0.9976    0.9974    178403
+        HIGH     0.9875    0.9862    0.9869    239792
+   VERY_HIGH     0.9010    0.9086    0.9048     28066
+
+    accuracy                         0.9939   1033680
+   macro avg     0.9714    0.9731    0.9723   1033680
+weighted avg     0.9939    0.9939    0.9939   1033680
+
+Confusion matrix (rows = TRUE, columns = PREDICTED):
+                     LOW    MODERATE        HIGH   VERY_HIGH
+         LOW     587,419           0           0           0
+    MODERATE           0     177,980         423           0
+        HIGH           0         513     236,477       2,802
+   VERY_HIGH           0           0       2,564      25,502
+
+######################################################################
+XGBoost -- TEST
+######################################################################
+              precision    recall  f1-score   support
+
+         LOW     1.0000    1.0000    1.0000   1156174
+    MODERATE     0.9886    0.9992    0.9939    322787
+        HIGH     0.9908    0.9879    0.9893    507433
+   VERY_HIGH     0.9702    0.9474    0.9587     83798
+
+    accuracy                         0.9948   2070192
+   macro avg     0.9874    0.9836    0.9855   2070192
+weighted avg     0.9948    0.9948    0.9948   2070192
+
+Confusion matrix (rows = TRUE, columns = PREDICTED):
+                     LOW    MODERATE        HIGH   VERY_HIGH
+         LOW   1,156,174           0           0           0
+    MODERATE           0     322,538         249           0
+        HIGH           0       3,712     501,279       2,442
+   VERY_HIGH           0           0       4,404      79,394
+
+######################################################################
+LightGBM -- VALIDATION
+######################################################################
+              precision    recall  f1-score   support
+
+         LOW     1.0000    1.0000    1.0000    587419
+    MODERATE     0.9999    1.0000    1.0000    178403
+        HIGH     0.9990    0.9991    0.9990    239792
+   VERY_HIGH     0.9925    0.9915    0.9920     28066
+
+    accuracy                         0.9996   1033680
+   macro avg     0.9979    0.9976    0.9978   1033680
+weighted avg     0.9996    0.9996    0.9996   1033680
+
+Confusion matrix (rows = TRUE, columns = PREDICTED):
+                     LOW    MODERATE        HIGH   VERY_HIGH
+         LOW     587,419           0           0           0
+    MODERATE           0     178,403           0           0
+        HIGH           0          16     239,567         209
+   VERY_HIGH           0           0         239      27,827
+
+######################################################################
+LightGBM -- TEST
+######################################################################
+              precision    recall  f1-score   support
+
+         LOW     1.0000    1.0000    1.0000   1156174
+    MODERATE     0.9992    1.0000    0.9996    322787
+        HIGH     0.9989    0.9992    0.9990    507433
+   VERY_HIGH     0.9981    0.9931    0.9956     83798
+
+    accuracy                         0.9995   2070192
+   macro avg     0.9990    0.9981    0.9986   2070192
+weighted avg     0.9995    0.9995    0.9995   2070192
+
+Confusion matrix (rows = TRUE, columns = PREDICTED):
+                     LOW    MODERATE        HIGH   VERY_HIGH
+         LOW   1,156,174           0           0           0
+    MODERATE           0     322,787           0           0
+        HIGH           0         255     507,020         158
+   VERY_HIGH           0           0         576      83,222
+
+######################################################################
+RandomForest -- VALIDATION
+######################################################################
+              precision    recall  f1-score   support
+
+         LOW     1.0000    0.9997    0.9999    587419
+    MODERATE     0.8907    0.9408    0.9151    178403
+        HIGH     0.9017    0.8898    0.8957    239792
+   VERY_HIGH     0.7179    0.5464    0.6205     28066
+
+    accuracy                         0.9518   1033680
+   macro avg     0.8776    0.8442    0.8578   1033680
+weighted avg     0.9507    0.9518    0.9508   1033680
+
+Confusion matrix (rows = TRUE, columns = PREDICTED):
+                     LOW    MODERATE        HIGH   VERY_HIGH
+         LOW     587,250         169           0           0
+    MODERATE           0     167,849      10,554           0
+        HIGH           0      20,390     213,376       6,026
+   VERY_HIGH           0          32      12,698      15,336
+
+######################################################################
+RandomForest -- TEST
+######################################################################
+              precision    recall  f1-score   support
+
+         LOW     1.0000    0.9999    0.9999   1156174
+    MODERATE     0.8494    0.9765    0.9086    322787
+        HIGH     0.9325    0.8775    0.9041    507433
+   VERY_HIGH     0.9014    0.7054    0.7915     83798
+
+    accuracy                         0.9543   2070192
+   macro avg     0.9208    0.8898    0.9010   2070192
+weighted avg     0.9560    0.9543    0.9538   2070192
+
+Confusion matrix (rows = TRUE, columns = PREDICTED):
+                     LOW    MODERATE        HIGH   VERY_HIGH
+         LOW   1,156,011         163           0           0
+    MODERATE           0     315,217       7,570           0
+        HIGH           0      55,711     445,254       6,468
+   VERY_HIGH           0           1      24,682      59,115

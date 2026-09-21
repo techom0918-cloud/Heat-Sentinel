@@ -1,0 +1,22 @@
+# HeatSentinal Phase 1 -- satellite/geospatial pipeline dependencies.
+#
+# Kept separate from backend/requirements.txt on purpose: the FastAPI app
+# does not need any of this, and these wheels are heavy on Windows (per
+# the existing note in backend/requirements.txt). Install with:
+#
+#     pip install -r requirements-phase1.txt
+#
+# If a wheel fails to resolve on your Python version, relax the pin to
+# the same major version (e.g. geopandas>=1.0,<2) rather than removing it.
+
+geopandas>=1.0
+shapely>=2.0
+pyproj>=3.6
+fiona>=1.9
+rasterio>=1.4
+numpy>=1.26
+pandas>=2.2
+
+# STAC search + Microsoft Planetary Computer asset signing.
+pystac-client>=0.8
+planetary-computer>=1.0

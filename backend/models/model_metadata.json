@@ -1,0 +1,102 @@
+{
+  "model_name": "LightGBM",
+  "target_column": "heat_index_category",
+  "target_classes_all": [
+    "LOW",
+    "MODERATE",
+    "HIGH",
+    "VERY_HIGH",
+    "EXTREME"
+  ],
+  "target_classes_learned": [
+    "LOW",
+    "MODERATE",
+    "HIGH",
+    "VERY_HIGH"
+  ],
+  "classes_with_no_training_data": [
+    "EXTREME"
+  ],
+  "training_period": [
+    2022
+  ],
+  "validation_period": [
+    2023
+  ],
+  "test_period": [
+    2024,
+    2025
+  ],
+  "sample_frac_used": 1.0,
+  "features_used": [
+    "temperature_2m_c",
+    "relative_humidity_pct",
+    "wind_speed_10m_ms",
+    "shortwave_radiation_wm2",
+    "month",
+    "day_of_year",
+    "hour",
+    "day_of_week",
+    "hour_sin",
+    "hour_cos",
+    "doy_sin",
+    "doy_cos",
+    "latitude",
+    "longitude",
+    "lst_mean_c_mean",
+    "lst_median_c_mean",
+    "lst_min_c_mean",
+    "lst_max_c_mean",
+    "lst_std_c_mean",
+    "ndvi_mean_mean",
+    "ndvi_median_mean",
+    "ndvi_min_mean",
+    "ndvi_max_mean",
+    "ndvi_std_mean",
+    "land_cover_fraction_mean",
+    "elevation_mean_m_mean",
+    "elevation_min_m_mean",
+    "elevation_max_m_mean"
+  ],
+  "excluded_leakage_columns": [
+    "heat_index_category",
+    "heat_index_c",
+    "wbgt_shade_proxy_c"
+  ],
+  "missing_value_handling": "median imputation fitted on training years only",
+  "class_imbalance_handling": "balanced class/sample weights (no oversampling)",
+  "selection_metric": "validation macro F1",
+  "metrics": {
+    "validation": {
+      "accuracy": 0.9996,
+      "macro_precision": 0.9979,
+      "macro_recall": 0.9976,
+      "macro_f1": 0.9978,
+      "weighted_f1": 0.9996,
+      "HIGH_precision": 0.999,
+      "HIGH_recall": 0.9991,
+      "HIGH_f1": 0.999,
+      "VERY_HIGH_precision": 0.9925,
+      "VERY_HIGH_recall": 0.9915,
+      "VERY_HIGH_f1": 0.992
+    },
+    "test": {
+      "accuracy": 0.9995,
+      "macro_precision": 0.999,
+      "macro_recall": 0.9981,
+      "macro_f1": 0.9986,
+      "weighted_f1": 0.9995,
+      "HIGH_precision": 0.9989,
+      "HIGH_recall": 0.9992,
+      "HIGH_f1": 0.999,
+      "VERY_HIGH_precision": 0.9981,
+      "VERY_HIGH_recall": 0.9931,
+      "VERY_HIGH_f1": 0.9956
+    }
+  },
+  "caveats": [
+    "Target is a deterministic formula of temperature + humidity; high scores mean the model re-learned that formula, not forecasting skill.",
+    "Weather resolution is ~10-25 km (118 points); 300m environmental features are summarised per weather point.",
+    "EXTREME has zero samples in 2022-2025 and cannot be predicted."
+  ]
+}
