@@ -20,3 +20,6 @@ backend/data/ncr_300m_grid.geojson
 backend/data/ncr_300m_grid.gpkg
 
 backend/.env
+
+phaseB/
+heat_pipeline (1) (1) (1).py
