@@ -1,0 +1,290 @@
+{
+  "type": "FeatureCollection",
+  "name": "HeatSentinal demo zones",
+  "data_status": "SYNTHETIC_DEMO",
+  "warning": "SYNTHETIC DEMO DATA - NOT FOR REAL-WORLD DECISION MAKING. These polygons are arbitrary rectangular cells drawn over Delhi for development and testing. They are NOT real administrative, ward or census boundaries, and the demographic values attached to them are invented. Replace with a real boundary file and real census, occupational, healthcare-access and NCRB/IMD mortality data before any operational use.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "ZONE_01",
+        "name": "North Cell",
+        "data_status": "SYNTHETIC_DEMO",
+        "centroid": [
+          77.1725,
+          28.6975
+        ],
+        "demographics": {
+          "elderly_population_pct": 14.8,
+          "outdoor_worker_pct": 41.0,
+          "population_density": 18500,
+          "healthcare_accessibility": 0.48,
+          "historical_heat_exposure": 0.74,
+          "historical_heat_mortality": 0.41
+        }
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              77.15,
+              28.68
+            ],
+            [
+              77.19500000000001,
+              28.68
+            ],
+            [
+              77.19500000000001,
+              28.715
+            ],
+            [
+              77.15,
+              28.715
+            ],
+            [
+              77.15,
+              28.68
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "ZONE_02",
+        "name": "Central Cell",
+        "data_status": "SYNTHETIC_DEMO",
+        "centroid": [
+          77.2225,
+          28.6475
+        ],
+        "demographics": {
+          "elderly_population_pct": 11.2,
+          "outdoor_worker_pct": 22.0,
+          "population_density": 9800,
+          "healthcare_accessibility": 0.81,
+          "historical_heat_exposure": 0.68,
+          "historical_heat_mortality": 0.22
+        }
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              77.2,
+              28.63
+            ],
+            [
+              77.245,
+              28.63
+            ],
+            [
+              77.245,
+              28.665
+            ],
+            [
+              77.2,
+              28.665
+            ],
+            [
+              77.2,
+              28.63
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "ZONE_03",
+        "name": "East Cell",
+        "data_status": "SYNTHETIC_DEMO",
+        "centroid": [
+          77.2825,
+          28.6575
+        ],
+        "demographics": {
+          "elderly_population_pct": 9.4,
+          "outdoor_worker_pct": 55.0,
+          "population_density": 12200,
+          "healthcare_accessibility": 0.35,
+          "historical_heat_exposure": 0.79,
+          "historical_heat_mortality": 0.52
+        }
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              77.26,
+              28.64
+            ],
+            [
+              77.305,
+              28.64
+            ],
+            [
+              77.305,
+              28.675
+            ],
+            [
+              77.26,
+              28.675
+            ],
+            [
+              77.26,
+              28.64
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "ZONE_04",
+        "name": "South Cell",
+        "data_status": "SYNTHETIC_DEMO",
+        "centroid": [
+          77.2325,
+          28.5575
+        ],
+        "demographics": {
+          "elderly_population_pct": 16.9,
+          "outdoor_worker_pct": 12.0,
+          "population_density": 4100,
+          "healthcare_accessibility": 0.88,
+          "historical_heat_exposure": 0.61,
+          "historical_heat_mortality": 0.14
+        }
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              77.21,
+              28.54
+            ],
+            [
+              77.255,
+              28.54
+            ],
+            [
+              77.255,
+              28.575
+            ],
+            [
+              77.21,
+              28.575
+            ],
+            [
+              77.21,
+              28.54
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "ZONE_05",
+        "name": "West Cell",
+        "data_status": "SYNTHETIC_DEMO",
+        "centroid": [
+          77.1225,
+          28.6175
+        ],
+        "demographics": {
+          "elderly_population_pct": 12.6,
+          "outdoor_worker_pct": 47.0,
+          "population_density": 15600,
+          "healthcare_accessibility": 0.42,
+          "historical_heat_exposure": 0.72,
+          "historical_heat_mortality": 0.44
+        }
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              77.1,
+              28.6
+            ],
+            [
+              77.145,
+              28.6
+            ],
+            [
+              77.145,
+              28.635
+            ],
+            [
+              77.1,
+              28.635
+            ],
+            [
+              77.1,
+              28.6
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "zone_id": "ZONE_06",
+        "name": "Peri-urban Cell",
+        "data_status": "SYNTHETIC_DEMO",
+        "centroid": [
+          77.3425,
+          28.5775
+        ],
+        "demographics": {
+          "elderly_population_pct": 8.1,
+          "outdoor_worker_pct": 68.0,
+          "population_density": 950,
+          "healthcare_accessibility": 0.21,
+          "historical_heat_exposure": 0.83,
+          "historical_heat_mortality": 0.58
+        }
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              77.32,
+              28.56
+            ],
+            [
+              77.365,
+              28.56
+            ],
+            [
+              77.365,
+              28.595
+            ],
+            [
+              77.32,
+              28.595
+            ],
+            [
+              77.32,
+              28.56
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

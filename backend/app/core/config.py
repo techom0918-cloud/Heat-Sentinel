@@ -140,6 +140,363 @@ class Settings(BaseSettings):
             if label.strip()
         ]
 
+    # ---- Health risk engine (Phase 5) -----------------------------------
+    # PROTOTYPE WEIGHTS. Not medically validated. Top level must sum to 1.0.
+    RISK_WEIGHT_THERMAL: float = 0.65
+    RISK_WEIGHT_VULNERABILITY: float = 0.35
+
+    # Contributions within the thermal block. Must sum to 1.0.
+    RISK_THERMAL_WEIGHT_HEAT_INDEX: float = 0.30
+    RISK_THERMAL_WEIGHT_WBGT: float = 0.35
+    RISK_THERMAL_WEIGHT_UTCI: float = 0.35
+
+    # Normalisation anchors, in degrees Celsius. Each index is scaled
+    # linearly from MIN (0.0) to MAX (1.0) and clamped.
+    #
+    # Heat Index: reuses the Phase 3 category edges (27 = first band above
+    # LOW, 54 = start of EXTREME) rather than inventing new numbers.
+    RISK_HEAT_INDEX_MIN_C: float = 27.0
+    RISK_HEAT_INDEX_MAX_C: float = 54.0
+    #
+    # WBGT: PROTOTYPE ANCHORS, EXPLICITLY UNCALIBRATED. Phase 3 deliberately
+    # returns NOT_CLASSIFIED for WBGT because ISO 7243 and ACGIH limits are
+    # defined on full outdoor WBGT, not the shade approximation computed
+    # here. Using those limits as anchors would contradict that. These are
+    # placeholder values pending calibration.
+    RISK_WBGT_MIN_C: float = 22.0
+    RISK_WBGT_MAX_C: float = 35.0
+    #
+    # UTCI: taken from the published UTCI thermal stress assessment scale
+    # (Brode et al. 2012) -- moderate heat stress begins at +26 C and
+    # extreme heat stress at +46 C. This is the one anchor pair with a
+    # documented source.
+    RISK_UTCI_MIN_C: float = 26.0
+    RISK_UTCI_MAX_C: float = 46.0
+
+    # PROTOTYPE category edges, configurable.
+    RISK_BOUNDS: str = "0.25,0.50,0.75"
+    RISK_CATEGORIES: str = "LOW,MODERATE,HIGH,EXTREME"
+
+    @property
+    def risk_thermal_weights(self) -> dict[str, float]:
+        """Weights within the thermal block."""
+        return {
+            "heat_index": self.RISK_THERMAL_WEIGHT_HEAT_INDEX,
+            "wbgt": self.RISK_THERMAL_WEIGHT_WBGT,
+            "utci": self.RISK_THERMAL_WEIGHT_UTCI,
+        }
+
+    @property
+    def risk_bounds_list(self) -> list[float]:
+        return [
+            float(edge.strip())
+            for edge in self.RISK_BOUNDS.split(",")
+            if edge.strip()
+        ]
+
+    @property
+    def risk_categories_list(self) -> list[str]:
+        return [
+            label.strip()
+            for label in self.RISK_CATEGORIES.split(",")
+            if label.strip()
+        ]
+
+    # ---- Forecast trajectory (Phase 7) ----------------------------------
+    FORECAST_MAX_DAYS: int = 5
+    # Mean category-level change between the earlier and later halves of the
+    # trajectory needed before a trend is called. Prototype threshold.
+    FORECAST_TREND_THRESHOLD: float = 0.5
+
+    # ---- Hyperlocal zones (Phase 8) -------------------------------------
+    # Relative to backend/ unless absolute. SYNTHETIC DEMO DATA.
+    ZONES_GEOJSON_PATH: str = "data/demo_zones.geojson"
+
+    # ---- Heat action simulator (Phase 9) --------------------------------
+    # PROTOTYPE ASSUMPTIONS, NOT VALIDATED EFFECTIVENESS. Each value is the
+    # maximum modelled effect at 100% coverage. No intervention evaluation
+    # data exists in this repository; these are plausible starting points
+    # held in one place so they can be replaced with real effect sizes.
+    INTERVENTION_COOLING_CENTER_EFFECT: float = 0.25
+    INTERVENTION_WATER_DISTRIBUTION_EFFECT: float = 0.12
+    INTERVENTION_WORK_HOUR_SHIFT_EFFECT: float = 0.20
+    INTERVENTION_PUBLIC_ALERT_EFFECT: float = 0.05
+    INTERVENTION_SHADE_REST_AREA_EFFECT: float = 0.10
+
+    @property
+    def intervention_effects(self) -> dict[str, float]:
+        """Maximum modelled effect per intervention type, at full coverage."""
+        return {
+            "COOLING_CENTER": self.INTERVENTION_COOLING_CENTER_EFFECT,
+            "WATER_DISTRIBUTION": self.INTERVENTION_WATER_DISTRIBUTION_EFFECT,
+            "WORK_HOUR_SHIFT": self.INTERVENTION_WORK_HOUR_SHIFT_EFFECT,
+            "PUBLIC_ALERT": self.INTERVENTION_PUBLIC_ALERT_EFFECT,
+            "SHADE_REST_AREA": self.INTERVENTION_SHADE_REST_AREA_EFFECT,
+        }
+
+    # ---- AI Action Optimizer (Phase 10) ----------------------------------
+    # PROTOTYPE UNIT ECONOMICS, NOT VALIDATED. Each intervention type maps to
+    # the physical resource it consumes, a cost per unit, and the fraction of
+    # a zone's population one unit is assumed to cover (linear, capped at
+    # 100%). Held here (and only here) so real procurement costs and reach
+    # figures can replace these without touching optimizer_service.py.
+    # Effectiveness itself is NOT duplicated here -- it still comes from
+    # INTERVENTION_*_EFFECT above via the Phase 9 simulator.
+    OPTIMIZER_COOLING_CENTER_RESOURCE: str = "cooling_centers"
+    OPTIMIZER_COOLING_CENTER_UNIT_COST: float = 50000.0
+    OPTIMIZER_COOLING_CENTER_COVERAGE_PER_UNIT: float = 0.15
+
+    OPTIMIZER_WATER_DISTRIBUTION_RESOURCE: str = "water_tankers"
+    OPTIMIZER_WATER_DISTRIBUTION_UNIT_COST: float = 8000.0
+    OPTIMIZER_WATER_DISTRIBUTION_COVERAGE_PER_UNIT: float = 0.08
+
+    # WORK_HOUR_SHIFT, PUBLIC_ALERT and SHADE_REST_AREA are all assumed to
+    # draw on the same "field_workers" pool (coordinating shift compliance,
+    # disseminating alerts, and standing up shaded rest areas respectively),
+    # so the optimizer must trade them off against one another for the same
+    # people -- a deliberate, documented prototype assumption.
+    OPTIMIZER_WORK_HOUR_SHIFT_RESOURCE: str = "field_workers"
+    OPTIMIZER_WORK_HOUR_SHIFT_UNIT_COST: float = 2000.0
+    OPTIMIZER_WORK_HOUR_SHIFT_COVERAGE_PER_UNIT: float = 0.02
+
+    OPTIMIZER_PUBLIC_ALERT_RESOURCE: str = "field_workers"
+    OPTIMIZER_PUBLIC_ALERT_UNIT_COST: float = 500.0
+    OPTIMIZER_PUBLIC_ALERT_COVERAGE_PER_UNIT: float = 0.02
+
+    OPTIMIZER_SHADE_REST_AREA_RESOURCE: str = "field_workers"
+    OPTIMIZER_SHADE_REST_AREA_UNIT_COST: float = 15000.0
+    OPTIMIZER_SHADE_REST_AREA_COVERAGE_PER_UNIT: float = 0.05
+
+    # Hard ceiling on greedy search steps, independent of budget/resource
+    # size, so a pathological request cannot make the optimizer loop forever.
+    OPTIMIZER_MAX_ITERATIONS: int = 1000
+
+    @property
+    def optimizer_unit_economics(self) -> dict[str, dict[str, float | str]]:
+        """Per-intervention resource type, unit cost and coverage per unit."""
+        return {
+            "COOLING_CENTER": {
+                "resource": self.OPTIMIZER_COOLING_CENTER_RESOURCE,
+                "unit_cost": self.OPTIMIZER_COOLING_CENTER_UNIT_COST,
+                "coverage_per_unit": (
+                    self.OPTIMIZER_COOLING_CENTER_COVERAGE_PER_UNIT
+                ),
+            },
+            "WATER_DISTRIBUTION": {
+                "resource": self.OPTIMIZER_WATER_DISTRIBUTION_RESOURCE,
+                "unit_cost": self.OPTIMIZER_WATER_DISTRIBUTION_UNIT_COST,
+                "coverage_per_unit": (
+                    self.OPTIMIZER_WATER_DISTRIBUTION_COVERAGE_PER_UNIT
+                ),
+            },
+            "WORK_HOUR_SHIFT": {
+                "resource": self.OPTIMIZER_WORK_HOUR_SHIFT_RESOURCE,
+                "unit_cost": self.OPTIMIZER_WORK_HOUR_SHIFT_UNIT_COST,
+                "coverage_per_unit": (
+                    self.OPTIMIZER_WORK_HOUR_SHIFT_COVERAGE_PER_UNIT
+                ),
+            },
+            "PUBLIC_ALERT": {
+                "resource": self.OPTIMIZER_PUBLIC_ALERT_RESOURCE,
+                "unit_cost": self.OPTIMIZER_PUBLIC_ALERT_UNIT_COST,
+                "coverage_per_unit": (
+                    self.OPTIMIZER_PUBLIC_ALERT_COVERAGE_PER_UNIT
+                ),
+            },
+            "SHADE_REST_AREA": {
+                "resource": self.OPTIMIZER_SHADE_REST_AREA_RESOURCE,
+                "unit_cost": self.OPTIMIZER_SHADE_REST_AREA_UNIT_COST,
+                "coverage_per_unit": (
+                    self.OPTIMIZER_SHADE_REST_AREA_COVERAGE_PER_UNIT
+                ),
+            },
+        }
+
+    # ---- Early warning & alerts (Phase 11) -------------------------------
+    # The 5-band scale produced by the trained model / Phase 7 trajectory
+    # (heat HAZARD categories: LOW..EXTREME). Alerts are evaluated on this
+    # scale, not the 4-band Phase 5 combined-risk scale, because the
+    # trajectory is what actually carries a forecast peak and a peak date.
+    ALERT_LEVELS: str = "LOW,MODERATE,HIGH,VERY_HIGH,EXTREME"
+    # Alert is required once the forecast peak reaches this level or above.
+    # An escalation (today's level vs. the peak) below this threshold is
+    # still detected and reported, but does not independently force an
+    # alert -- see alert_service.evaluate_alert.
+    ALERT_MIN_LEVEL: str = "HIGH"
+    # Vulnerability level (Phase 4 scale) at/above which alert priority is
+    # escalated, per the "high heat + high vulnerability" rule.
+    ALERT_HIGH_VULNERABILITY_LEVELS: str = "HIGH,EXTREME"
+
+    @property
+    def alert_levels_list(self) -> list[str]:
+        return [
+            label.strip()
+            for label in self.ALERT_LEVELS.split(",")
+            if label.strip()
+        ]
+
+    @property
+    def alert_high_vulnerability_levels_list(self) -> list[str]:
+        return [
+            label.strip()
+            for label in self.ALERT_HIGH_VULNERABILITY_LEVELS.split(",")
+            if label.strip()
+        ]
+
+    @property
+    def alert_recommended_actions(self) -> dict[str, list[str]]:
+        """Decision-support action text per alert level. Not medical advice."""
+        return {
+            "LOW": [],
+            "MODERATE": ["Monitor the forecast for further escalation."],
+            "HIGH": [
+                "Activate cooling centers",
+                "Issue public heat advisory",
+                "Review outdoor work schedules",
+            ],
+            "VERY_HIGH": [
+                "Activate cooling centers",
+                "Issue public heat warning",
+                "Review outdoor work restrictions",
+                "Prioritise water distribution in high-vulnerability zones",
+            ],
+            "EXTREME": [
+                "Activate cooling centers",
+                "Issue public heat warning",
+                "Review outdoor work restrictions",
+                "Prioritise water distribution in high-vulnerability zones",
+                "Coordinate with local health authorities",
+            ],
+        }
+
+    # ---- Health / mortality data integration (Phase 12) ------------------
+    # Relative to backend/ unless absolute. REAL government-reported data
+    # (see the file's own `source` column), not synthetic.
+    HEALTH_DATA_CSV_PATH: str = "data/heat_wave_deaths_india_2018_2022.csv"
+    # A state-year is labelled an observed "high-risk event" once reported
+    # deaths reach this count. PROTOTYPE THRESHOLD, not an epidemiological
+    # cut-off -- configurable so it can be recalibrated.
+    HEALTH_HIGH_RISK_DEATH_THRESHOLD: int = 50
+
+    # ---- Personalised heat risk profile (personalisation layer) ----------
+    # Storage root for the three separated record types. Relative paths are
+    # resolved against backend/ so the working directory does not matter.
+    PERSONALISATION_STORE_PATH: str = "data/personalisation"
+
+    # Blend between the existing environmental engine and the personal
+    # vulnerability layer. The environmental half is produced by
+    # risk_service.predict_risk and is NOT recomputed here.
+    PERSONAL_ENVIRONMENT_WEIGHT: float = 0.65
+    PERSONAL_VULNERABILITY_WEIGHT: float = 0.35
+
+    # Weights inside the personal vulnerability score. Must sum to 1.0;
+    # validated at call time so a bad override fails loudly.
+    PERSONAL_W_ACCLIMATISATION: float = 0.20
+    PERSONAL_W_EXPOSURE: float = 0.22
+    PERSONAL_W_ACTIVITY: float = 0.15
+    PERSONAL_W_HYDRATION: float = 0.15
+    PERSONAL_W_PROTECTION: float = 0.13
+    PERSONAL_W_AGE: float = 0.10
+    PERSONAL_W_CLIMATE: float = 0.05
+
+    # Self-reported health context is applied as a small capped uplift rather
+    # than folded into the weights, so it can never dominate the score.
+    PERSONAL_HEALTH_UPLIFT_MAX: float = 0.10
+    # BMI is deliberately a minor term. Body size is a weak and contested
+    # predictor of heat strain compared with acclimatisation and exposure.
+    PERSONAL_BMI_UPLIFT_MAX: float = 0.03
+
+    # Population vulnerability handed to the existing risk engine when
+    # scoring an individual. Neutral on purpose: the personal layer
+    # supplies the person-specific half, so a zone score here would
+    # double-count vulnerability.
+    PERSONAL_NEUTRAL_VULNERABILITY: float = 0.5
+
+    # Symptoms that must trigger an urgent-care message instead of a score
+    # change. Never used as a numeric input.
+    PERSONAL_RED_FLAG_SYMPTOMS: str = (
+        "fainting,confusion,difficulty_staying_awake,"
+        "severe_dizziness,severe_weakness,seizure,not_sweating"
+    )
+
+    # Early signs of heat exhaustion. Also never scored, but they earn an
+    # advisory because this is the stage where acting prevents heat stroke.
+    PERSONAL_EARLY_WARNING_SYMPTOMS: str = (
+        "unusual_thirst,headache,dizziness,light_headedness,weakness,"
+        "unusual_tiredness,nausea,vomiting,muscle_cramps,heavy_sweating"
+    )
+
+    @property
+    def personal_early_warning_list(self) -> list[str]:
+        return [
+            s.strip().lower()
+            for s in self.PERSONAL_EARLY_WARNING_SYMPTOMS.split(",")
+            if s.strip()
+        ]
+
+    @property
+    def personal_red_flag_list(self) -> list[str]:
+        return [
+            s.strip().lower()
+            for s in self.PERSONAL_RED_FLAG_SYMPTOMS.split(",")
+            if s.strip()
+        ]
+
+    @property
+    def personal_vulnerability_weights(self) -> dict[str, float]:
+        return {
+            "acclimatisation": self.PERSONAL_W_ACCLIMATISATION,
+            "exposure": self.PERSONAL_W_EXPOSURE,
+            "activity": self.PERSONAL_W_ACTIVITY,
+            "hydration": self.PERSONAL_W_HYDRATION,
+            "protection": self.PERSONAL_W_PROTECTION,
+            "age": self.PERSONAL_W_AGE,
+            "usual_climate": self.PERSONAL_W_CLIMATE,
+        }
+
+    # ---- User accounts: signup/login/forgot-password (Phase 16) ---------
+    # PROTOTYPE PERSISTENCE. SQLite (stdlib, no new dependency) rather than
+    # the PostgreSQL DATABASE_URL below -- this is a lightweight account
+    # store for personalization, not a production identity system. Path is
+    # relative to backend/ unless absolute.
+    AUTH_DB_PATH: str = "data/users.db"
+    AUTH_PASSWORD_MIN_LENGTH: int = 8
+    # PBKDF2-HMAC-SHA256 iteration count (OWASP 2023 minimum guidance).
+    AUTH_PBKDF2_ITERATIONS: int = 260_000
+    AUTH_SESSION_TOKEN_BYTES: int = 32
+    AUTH_SESSION_EXPIRY_SECONDS: int = 60 * 60 * 24 * 7  # 7 days
+    # A password reset token is deliberately short-lived -- it only has to
+    # survive the few seconds between verifying security answers and
+    # submitting a new password.
+    AUTH_RESET_TOKEN_EXPIRY_SECONDS: int = 600  # 10 minutes
+    AUTH_SECURITY_QUESTIONS_REQUIRED: int = 2
+    # "|"-separated (not "," -- a question could plausibly contain a comma).
+    AUTH_SECURITY_QUESTIONS: str = (
+        "What is your pet's name?|"
+        "What is your mother's maiden name?|"
+        "What city were you born in?|"
+        "What was the name of your first school?|"
+        "What is your favourite food?"
+    )
+
+    @property
+    def auth_security_questions_list(self) -> list[str]:
+        return [
+            q.strip() for q in self.AUTH_SECURITY_QUESTIONS.split("|") if q.strip()
+        ]
+
+    # ---- Trained model integration --------------------------------------
+    # Paths are relative to backend/ unless absolute.
+    # heat_pipeline.py writes heat_model.joblib into its own directory.
+    ML_MODEL_PATH: str = "../ml/heat_model.joblib"
+    # The pipeline module is imported, not vendored, so that the features
+    # served are produced by the same code that produced the features
+    # trained on. Reimplementing them would drift silently.
+    ML_PIPELINE_PATH: str = "../ml/heat_pipeline.py"
+    # Hourly history fetched per forecast. The pipeline needs at least 14
+    # complete days after daily aggregation; 35 leaves room for gaps.
+    ML_HISTORY_DAYS: int = 35
+
     # ---- Machine learning (used from Phase 13 onwards) ------------------
     MODEL_PATH: str = "ml/models"
 
@@ -150,7 +507,10 @@ class Settings(BaseSettings):
     # Stored as a plain comma-separated string on purpose. pydantic-settings
     # tries to JSON-decode list-typed fields, which makes a normal
     # `CORS_ORIGINS=a,b` line in .env blow up. Parsing happens below instead.
-    CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
+    CORS_ORIGINS: str = (
+        "http://localhost:5500,http://127.0.0.1:5500,"
+        "http://localhost:5173,http://127.0.0.1:5173"
+    )
 
     @property
     def cors_origins_list(self) -> list[str]:
