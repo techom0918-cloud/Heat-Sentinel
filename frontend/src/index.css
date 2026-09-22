@@ -1,0 +1,90 @@
+@import url("https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-ink-950 text-ink-100 antialiased;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: "Source Serif 4", Georgia, serif;
+}
+
+::selection {
+  @apply bg-brand-600/40;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-ink-700 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-ink-600;
+}
+
+/* Leaflet chrome tweaks -- the tile layer itself is the standard light
+   OpenStreetMap basemap (see RiskMap.jsx); these adjust Leaflet's own
+   popup/control styling to match the light theme via the `ink` scale
+   (which resolves to light values -- see tailwind.config.js). */
+.leaflet-container {
+  background: #EFEAE0 !important;
+  font-family: "Inter", sans-serif !important;
+}
+.leaflet-popup-content-wrapper {
+  @apply !bg-ink-850 !text-ink-100 !rounded-xl !shadow-2xl border border-ink-700;
+}
+.leaflet-popup-tip {
+  @apply !bg-ink-850;
+}
+.leaflet-control-zoom a {
+  @apply !bg-ink-850 !text-ink-100 !border-ink-700;
+}
+.leaflet-control-zoom a:hover {
+  @apply !bg-ink-700;
+}
+.leaflet-control-attribution {
+  @apply !bg-ink-900/70 !text-ink-400;
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg bg-ink-900 border border-ink-600 px-3 py-2 text-sm text-ink-100
+      placeholder:text-ink-500 outline-none transition-colors
+      focus:border-brand-500 focus:ring-1 focus:ring-brand-500/40;
+  }
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg bg-brand-700 hover:bg-brand-600 text-white text-sm font-semibold
+      transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply px-4 py-2 rounded-lg border border-ink-600 text-ink-300 text-sm font-medium
+      hover:text-white hover:border-brand-500 transition-colors disabled:opacity-50;
+  }
+}
+
+.input {
+  @apply w-full rounded-lg bg-ink-900 border border-ink-600 px-3 py-2 text-sm text-white
+    placeholder:text-ink-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500;
+}

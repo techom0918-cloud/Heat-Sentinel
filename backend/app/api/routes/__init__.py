@@ -11,8 +11,10 @@ from app.api.routes import (
     auth,
     forecast,
     geospatial,
+    grid,
     health,
     health_data,
+    heat_index,
     intervention,
     personalization,
     risk,
@@ -29,6 +31,8 @@ api_router.include_router(vulnerability.router)
 api_router.include_router(risk.router)
 api_router.include_router(forecast.router)
 api_router.include_router(geospatial.router)
+api_router.include_router(heat_index.router)
+api_router.include_router(grid.router)
 api_router.include_router(intervention.router)
 api_router.include_router(alerts.router)
 api_router.include_router(health_data.router)

@@ -497,6 +497,24 @@ class Settings(BaseSettings):
     # complete days after daily aggregation; 35 leaves room for gaps.
     ML_HISTORY_DAYS: int = 35
 
+    # ---- Phase 8/9/11: current-condition Heat Index classifier ----------
+    # A SEPARATE model from ML_MODEL_PATH above -- see heat_index_service.py
+    # docstring for why these are not the same model.
+    HEAT_INDEX_MODEL_PATH: str = "models/heat_index_model.joblib"
+    HEAT_INDEX_METADATA_PATH: str = "models/model_metadata.json"
+    # Phase 9 batch pipeline outputs (precomputed, not live per-request).
+    HEAT_INDEX_GRID_PREDICTIONS_PATH: str = "data/phase2/grid_predictions_300m.parquet"
+    HEAT_INDEX_GRID_ENV_PATH: str = "data/phase1/heat_environment_300m.csv"
+    HEAT_INDEX_WEATHER_MAPPING_PATH: str = (
+        "data/phase2/ml_handoff/03_weather_to_300m_mapping.parquet"
+    )
+    HEAT_INDEX_WEATHER_HISTORY_PATH: str = (
+        "data/phase2/ml_handoff/02_weather_2022_2025_with_point_id.parquet"
+    )
+    # Safety cap: never return more cells than this from /grid/risk in one
+    # response, regardless of bbox size.
+    GRID_RISK_MAX_CELLS: int = 5000
+
     # ---- Machine learning (used from Phase 13 onwards) ------------------
     MODEL_PATH: str = "ml/models"
 
