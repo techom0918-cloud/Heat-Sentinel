@@ -31,7 +31,6 @@ data/processed/
 
 # ML
 *.pkl
-*.joblib
 *.h5
 *.pt
 *.pth
@@ -51,7 +50,6 @@ future_risk_predictions.csv
 
 # ML artifacts - regenerable, too large for git
 ml/heat_raw_hourly.csv
-ml/*.joblib
 ml/future_risk_predictions.csv
 ml/train_log.txt
 
