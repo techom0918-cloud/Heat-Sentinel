@@ -15,7 +15,9 @@ Two provider quirks are handled here rather than leaking downstream:
     from the hourly series.
 """
 
+import asyncio
 import logging
+import time
 from datetime import date as date_type
 from datetime import datetime, timezone
 from typing import Any
@@ -33,6 +35,19 @@ from app.models.weather import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Provider cache
+# ---------------------------------------------------------------------------
+# Open-Meteo is called by multiple frontend requests. Keep successful
+# responses briefly in memory so repeated requests do not consume the
+# provider quota unnecessarily.
+_WEATHER_CACHE: dict[tuple[tuple[str, Any], ...], tuple[float, dict[str, Any]]] = {}
+_WEATHER_CACHE_LOCK = asyncio.Lock()
+
+CURRENT_CACHE_TTL = 10 * 60       # 10 minutes
+FORECAST_CACHE_TTL = 30 * 60      # 30 minutes
+HISTORY_CACHE_TTL = 60 * 60       # 1 hour
 
 # Requested from the `current` block. Every name here is a documented
 # Open-Meteo current variable.
@@ -115,61 +130,80 @@ def validate_days(days: int) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def _call_provider(params: dict[str, Any]) -> dict[str, Any]:
-    """Issue one request to the provider and return the decoded payload.
-
-    Every failure mode is converted to ExternalServiceError so callers never
-    have to know that httpx or Open-Meteo are involved.
-    """
+async def _call_provider(
+    params: dict[str, Any],
+    cache_ttl: int = CURRENT_CACHE_TTL,
+) -> dict[str, Any]:
+    """Issue one request to the provider, using a short-lived memory cache."""
     url = settings.WEATHER_API_URL
     timeout = settings.REQUEST_TIMEOUT_SECONDS
 
-    try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.get(url, params=params)
-    except httpx.TimeoutException as exc:
-        logger.warning("Weather provider timed out after %ss: %s", timeout, exc)
-        raise ExternalServiceError(
-            "The weather provider did not respond in time.",
-            details={"provider": settings.WEATHER_PROVIDER, "timeout_s": timeout},
-        ) from exc
-    except httpx.RequestError as exc:
-        logger.warning("Weather provider unreachable: %s", exc)
-        raise ExternalServiceError(
-            "The weather provider could not be reached.",
-            details={"provider": settings.WEATHER_PROVIDER},
-        ) from exc
+    # All current/history/forecast params are scalar values or strings, so
+    # this produces a stable, hashable cache key.
+    cache_key = tuple(sorted(params.items()))
 
-    if response.status_code >= 400:
-        # Open-Meteo reports its own errors as {"error": true, "reason": ...}
-        reason = _extract_error_reason(response)
-        logger.warning(
-            "Weather provider returned %s: %s", response.status_code, reason
-        )
-        raise ExternalServiceError(
-            "The weather provider rejected the request.",
-            details={
-                "provider": settings.WEATHER_PROVIDER,
-                "status_code": response.status_code,
-                "reason": reason,
-            },
-        )
+    async with _WEATHER_CACHE_LOCK:
+        cached = _WEATHER_CACHE.get(cache_key)
+        if cached is not None:
+            cached_at, cached_payload = cached
+            if time.monotonic() - cached_at < cache_ttl:
+                logger.info(
+                    "Weather cache hit for %s,%s",
+                    params.get("latitude"),
+                    params.get("longitude"),
+                )
+                return cached_payload
+            _WEATHER_CACHE.pop(cache_key, None)
 
-    try:
-        payload = response.json()
-    except ValueError as exc:
-        raise ExternalServiceError(
-            "The weather provider returned a malformed response.",
-            details={"provider": settings.WEATHER_PROVIDER},
-        ) from exc
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(url, params=params)
+        except httpx.TimeoutException as exc:
+            logger.warning("Weather provider timed out after %ss: %s", timeout, exc)
+            raise ExternalServiceError(
+                "The weather provider did not respond in time.",
+                details={"provider": settings.WEATHER_PROVIDER, "timeout_s": timeout},
+            ) from exc
+        except httpx.RequestError as exc:
+            logger.warning("Weather provider unreachable: %s", exc)
+            raise ExternalServiceError(
+                "The weather provider could not be reached.",
+                details={"provider": settings.WEATHER_PROVIDER},
+            ) from exc
 
-    if not isinstance(payload, dict):
-        raise ExternalServiceError(
-            "The weather provider returned an unexpected payload shape.",
-            details={"provider": settings.WEATHER_PROVIDER},
-        )
+        if response.status_code >= 400:
+            reason = _extract_error_reason(response)
+            logger.warning(
+                "Weather provider returned %s: %s",
+                response.status_code,
+                reason,
+            )
+            raise ExternalServiceError(
+                "The weather provider rejected the request.",
+                details={
+                    "provider": settings.WEATHER_PROVIDER,
+                    "status_code": response.status_code,
+                    "reason": reason,
+                },
+            )
 
-    return payload
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise ExternalServiceError(
+                "The weather provider returned a malformed response.",
+                details={"provider": settings.WEATHER_PROVIDER},
+            ) from exc
+
+        if not isinstance(payload, dict):
+            raise ExternalServiceError(
+                "The weather provider returned an unexpected payload shape.",
+                details={"provider": settings.WEATHER_PROVIDER},
+            )
+
+        _WEATHER_CACHE[cache_key] = (time.monotonic(), payload)
+        logger.info("Weather provider response cached for %ss", cache_ttl)
+        return payload
 
 
 def _extract_error_reason(response: httpx.Response) -> str:
@@ -312,7 +346,10 @@ async def get_current_weather(
     params["hourly"] = "shortwave_radiation"
     params["forecast_days"] = 1
 
-    payload = await _call_provider(params)
+    payload = await _call_provider(
+        params,
+        cache_ttl=CURRENT_CACHE_TTL,
+    )
 
     current = payload.get("current")
     if not isinstance(current, dict):
@@ -375,7 +412,10 @@ async def get_forecast(
     params["hourly"] = ",".join(_HOURLY_VARIABLES)
     params["forecast_days"] = days
 
-    payload = await _call_provider(params)
+    payload = await _call_provider(
+        params,
+        cache_ttl=FORECAST_CACHE_TTL,
+    )
 
     daily = payload.get("daily")
     if not isinstance(daily, dict) or not isinstance(daily.get("time"), list):
@@ -468,7 +508,10 @@ async def get_hourly_history(
     params["past_days"] = past_days
     params["forecast_days"] = forecast_days
 
-    payload = await _call_provider(params)
+    payload = await _call_provider(
+        params,
+        cache_ttl=HISTORY_CACHE_TTL,
+    )
 
     hourly = payload.get("hourly")
     if not isinstance(hourly, dict) or not isinstance(hourly.get("time"), list):
