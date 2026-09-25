@@ -50,6 +50,9 @@ import numpy as np
 import pandas as pd
 import joblib
 
+from pathlib import Path
+MODEL_PATH = Path(__file__).resolve().parent / "heat_model.joblib"
+
 from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
@@ -513,8 +516,8 @@ def main():
     joblib.dump({"model": model, "scaler": scaler, "features": features,
                  "risk_levels": RISK_LEVELS, "horizon_days": HORIZON,
                  "heat_index_edges": HEAT_INDEX_EDGES, "test_metrics": metrics},
-                "heat_model.joblib")
-    print("\nsaved heat_model.joblib")
+                MODEL_PATH)
+    print(f"\nsaved {MODEL_PATH}")
 
     # live forecast from the tail of the record
     recent = raw[raw["timestamp"] >= raw["timestamp"].max() - pd.Timedelta(days=40)]
